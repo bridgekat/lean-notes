@@ -32,7 +32,7 @@ namespace vec
 end vec
 
 #check vec.empty ℕ
-noncomputable def v0 := vec.empty ℕ -- What is `noncomputable`?
+noncomputable def v0 := vec.empty ℕ -- TODO: what is `noncomputable`?
 #check v0
 noncomputable def v1 := vec.cons 0 v0
 #check v1
@@ -113,7 +113,6 @@ example : ¬(p ∨ q) ↔ ¬p ∧ ¬q :=
     (λ ⟨hnp, hnq⟩, (λ h, h.elim hnp hnq))
 example : ¬p ∨ ¬q → ¬(p ∧ q) :=
   (λ h ⟨hp, hq⟩, h.elim (λ hnp, hnp hp) (λ hnq, hnq hq))
--- Intuitionistic: de Morgan 里面是 ∧ 的时候不能把 ¬ 移进去?
 example : ¬(p ∧ ¬p) := (λ ⟨hp, hnp⟩, hnp hp)
 example : p ∧ ¬q → ¬(p → q) := (λ ⟨hp, hnq⟩ hpq, hnq (hpq hp))
 example : ¬p → (p → q) := (λ hnp hp, (hnp hp).elim)
@@ -158,7 +157,7 @@ example : (((p → q) → p) → p) :=
 -- Prove ¬(p ↔ ¬p) without using classical logic.
 example : ¬(p ↔ ¬p) :=
   (λ ⟨h₁, h₂⟩,
-    (λ hp, h₁ hp hp) -- Don't eliminate cuts!
+    (λ hp, h₁ hp hp) -- "Don't eliminate cuts!" (will make the proof longer)
       (h₂ (λ hp, h₁ hp hp)))
 
 end exercise_3_2
@@ -469,14 +468,14 @@ end exercise_5_3
 /-
 Note:
   `tauto` (and `tauto!` for classical) seems to use sequent calculus (elim then intro);
-  `finish` seems to use SMT?
-  Both are complete for propositional logic.
+  `finish` seems to use SMT? (TODO: what is SMT...)
+  Both are complete for propositional logic...?
 -/
 
 
 -- ### Exercise 6
 
--- Complete reading: https://leanprover.github.io/theorem_proving_in_lean/interacting_with_lean.html
+-- TODO: complete reading: https://leanprover.github.io/theorem_proving_in_lean/interacting_with_lean.html
 
 
 -- ### Exercise 7
@@ -492,8 +491,7 @@ inductive mybool : Type
 | ff : mybool
 | tt : mybool
 
-section
-  open mybool
+namespace mybool
 
   def bnot : mybool → mybool :=
     @mybool.rec (λ _, mybool) tt ff
@@ -503,7 +501,8 @@ section
   
   def bor : mybool → mybool → mybool :=
     λ a b, @mybool.rec (λ _, mybool) b tt a
-end
+
+end mybool
 
 universe u
 
@@ -512,40 +511,188 @@ inductive myeq {α : Sort u} (l : α) : α → Prop
 | refl [] : myeq l
 
 namespace myeq
-  def myeq_symm : Π {α : Sort u} {x y : α} (h : myeq x y), myeq y x :=
+
+  lemma myeq_symm : Π {α : Sort u} {x y : α} (h : myeq x y), myeq y x :=
     λ α x y h, @myeq.rec α x -- The subject is `myeq {α} x`
       (λ r, myeq r x) -- Make a more general claim: given `myeq x r` then `myeq r x`
       (myeq.refl x)   -- Now given `myeq x x` (implicit), prove `myeq x x`
         y h           -- Then we could specialise `r` to `y`, and give a `myeq x y` to make `myeq y x`
   
-  def myeq_trans : Π {α : Sort u} {x y z : α} (h₁ : myeq x y) (h₂ : myeq y z), myeq x z :=
+  lemma myeq_trans : Π {α : Sort u} {x y z : α} (h₁ : myeq x y) (h₂ : myeq y z), myeq x z :=
     λ α x y z h₁ h₂, @myeq.rec α y -- The subject is `myeq {α} y`
       (λ r, myeq x r) -- Make a more general claim: given `myeq y r` then `myeq x r`
       h₁              -- Now given `myeq y y` (implicit), prove `myeq x y`
         z h₂          -- Then we could specialise `r` to `z`, and give a `myeq y z` to make `myeq x z`
   
-  def myeq_congr : Π {α β : Sort u} {x y : α} (f : α → β) (h : myeq x y), myeq (f x) (f y) :=
+  lemma myeq_congr : Π {α β : Sort u} {x y : α} (f : α → β) (h : myeq x y), myeq (f x) (f y) :=
     λ α β x y f h, @myeq.rec α x
       (λ r, myeq (f x) (f r))
       (myeq.refl (f x))
         y h
   
-  def myeq_subst : Π {α : Sort u} {x y : α} (p : α → Prop) (h₁ : myeq x y) (h₂ : p x), p y :=
+  lemma myeq_subst : Π {α : Sort u} {x y : α} (p : α → Prop) (h₁ : myeq x y) (h₂ : p x), p y :=
     λ α x y p h₁ h₂, @myeq.rec α x
       (λ r, p r)
       h₂
         y h₁
   
   -- Simplify by removing `@` and abbreviating arguments
-  def myeq_symm' {α : Sort u} {x y : α} (h : myeq x y) : myeq y x :=
+  lemma myeq_symm' {α : Sort u} {x y : α} (h : myeq x y) : myeq y x :=
     myeq.rec (myeq.refl x) h
-  def myeq_trans' {α : Sort u} {x y z : α} (h₁ : myeq x y) (h₂ : myeq y z) : myeq x z :=
+  lemma myeq_trans' {α : Sort u} {x y z : α} (h₁ : myeq x y) (h₂ : myeq y z) : myeq x z :=
     myeq.rec h₁ h₂
-  def myeq_congr' {α β : Sort u} {x y : α} (f : α → β) (h : myeq x y) : myeq (f x) (f y) :=
+  lemma myeq_congr' {α β : Sort u} {x y : α} (f : α → β) (h : myeq x y) : myeq (f x) (f y) :=
     myeq.rec (myeq.refl (f x)) h
-  def myeq_subst' {α : Sort u} {x y : α} (p : α → Prop) (h₁ : myeq x y) (h₂ : p x) : p y :=
+  lemma myeq_subst' {α : Sort u} {x y : α} (p : α → Prop) (h₁ : myeq x y) (h₂ : p x) : p y :=
     myeq.rec h₂ h₁
+
 end myeq
+
+namespace mybool
+
+  lemma em : Π (a : mybool), myeq (bor a (bnot a)) tt :=
+    @mybool.rec
+      (λ x, myeq (bor x (bnot x)) tt)
+      (myeq.refl tt) -- Lean refers to definitions and does the calculation automatically
+      (myeq.refl tt) -- So `myeq (bor tt (bnot tt)) tt` unifies with `myeq tt tt`!
+  
+  lemma de_morgan : Π (a b : mybool), myeq (bnot (band a b)) (bor (bnot a) (bnot b)) :=
+    λ a b, @mybool.rec -- By cases on `a`
+      (λ a', myeq (bnot (band a' b)) (bor (bnot a') (bnot b)))
+      (@mybool.rec     -- By cases on `b`
+        (λ b', myeq (bnot (band ff b')) (bor (bnot ff) (bnot b')))
+        (myeq.refl tt)
+        (myeq.refl tt)
+          b)
+      (@mybool.rec     -- By cases on `b`
+        (λ b', myeq (bnot (band tt b')) (bor (bnot tt) (bnot b')))
+        (myeq.refl tt)
+        (myeq.refl ff)
+          b)
+        a
+  
+  -- Simplify by removing `@` and abbreviating arguments
+  lemma de_morgan' (a b : mybool) : myeq (bnot (band a b)) (bor (bnot a) (bnot b)) :=
+    mybool.rec_on b
+      (mybool.rec_on a (myeq.refl _) (myeq.refl _))
+      (mybool.rec_on a (myeq.refl _) (myeq.refl _))
+
+end mybool
+
+inductive maybe (α : Type u) : Type u
+| nothing :     maybe
+| just    : α → maybe
+
+inductive inhabited (α : Type u) : Type u
+| mk : α → inhabited
+
+namespace maybe
+
+  -- The "monad operation"
+  def bind : Π {α β : Type u}, maybe α → (α → maybe β) → maybe β :=
+    λ α β ma f, @maybe.rec α
+      (λ _, maybe β)
+      (nothing)
+      (λ a, f a)
+        ma
+  
+  -- Partial function composition
+  def compose : Π {α β γ : Type u}, (β → maybe γ) → (α → maybe β) → α → maybe γ :=
+    λ α β γ g f a, @maybe.rec β
+      (λ _, maybe γ)
+      (nothing)
+      (λ b, g b)
+        (f a)
+  
+  -- Simplified versions
+  def bind' {α β : Type u} (ma : maybe α) (f : α → maybe β) : maybe β :=
+    maybe.rec nothing f ma
+  def compose' {α β γ : Type u} (g : β → maybe γ) (f : α → maybe β) (a : α) : maybe γ :=
+    maybe.rec nothing g (f a)
+  def compose'' {α β γ : Type u} (g : β → maybe γ) (f : α → maybe β) (a : α) : maybe γ :=
+    bind' (f a) g
+
+end maybe
+
+section
+  def is_even (x : ℕ) : bool := nat.rec_on x tt (λ _, @bool.rec (λ _, bool) bool.tt bool.ff)
+  def filter (x : ℕ) : maybe ℕ := bool.cases_on (is_even x) (maybe.just x.succ) maybe.nothing
+  #reduce filter 3
+  #reduce (maybe.compose'' filter filter) 3
+end
+
+section
+  #check inhabited      -- The type former
+  #check @inhabited.mk  -- The constructor
+
+  def inhabited_bool : inhabited bool := inhabited.mk tt
+  def inhabited_nat  : inhabited nat  := inhabited.mk 0
+
+  def inhabited_prod_of_inhabited : Π {α β : Type u}
+    (i₁ : inhabited α) (i₂ : inhabited β),
+    inhabited (prod α β) :=
+      λ α β i₁ i₂, inhabited.mk (inhabited.rec id i₁, inhabited.rec id i₂)
+  
+  def inhabited_of_function_to_inhabited : Π {α β : Type u}
+    (i : inhabited β),
+    inhabited (α → β) :=
+      λ α β i, inhabited.mk (λ _, inhabited.rec id i)
+   
+  def inhabited_of_function_to_inhabited' : Π {α : Type u} {τ : α → Type u}
+    (i : Π (a : α), inhabited (τ a)),
+    inhabited (Π (a : α), τ a) :=
+      λ α τ i, inhabited.mk (λ a, inhabited.rec id (i a))
+end
+
+inductive mylist (α : Type u) : Type u
+| nil  :              mylist
+| cons : α → mylist → mylist
+
+namespace mylist
+  variable {α : Type u}
+
+  def append (s t : mylist α) : mylist α :=
+    mylist.rec_on s t (λ a _, λ st', cons a st')
+
+  notation h :: t := cons h t -- ?
+  notation s ++ t := append s t -- ?
+  notation `[` l:(foldr `,` (h t, cons h t) nil) `]` := l -- ?????
+
+  section
+    open nat
+    #check [1, 2, 3, 4, 5]
+    #check ([1, 2, 3, 4, 5] : mylist int)
+  end
+
+  theorem nil_append (t : mylist α) : nil ++ t = t := eq.refl t
+  theorem cons_append (x : α) (s t : mylist α) : x::s ++ t = x::(s ++ t) := eq.refl _
+
+  -- Manual equational rewriting!
+  theorem append_nil (t : mylist α) : t ++ nil = t :=
+    @mylist.rec_on α
+      (λ l, l ++ nil = l) t
+      (eq.refl nil)
+      (λ a as, λ ih, (@eq.subst _ (λ φ, a::as ++ nil = a::φ) _ _ ih (eq.refl _)))
+  
+  -- Tip: have a notepad open, keep track of the current "state"...
+  theorem append_assoc (r s t : mylist α) : r ++ s ++ t = r ++ (s ++ t) :=
+    @mylist.rec_on α
+      (λ l, (l ++ s) ++ t = l ++ (s ++ t)) r
+      (eq.refl (s ++ t))
+      (λ a as, λ ih,
+        (@eq.subst _ (λ φ, (a::as ++ s) ++ t = a::φ) _ _ ih
+          (@eq.subst _ (λ φ, (a::as ++ s) ++ t = φ) _ _ (cons_append a (as ++ s) t)
+            (@eq.subst _ (λ φ, (a::as ++ s) ++ t = φ ++ t) _ _ (cons_append a as s)
+              (eq.refl ((a::as ++ s) ++ t)))))) -- Read bottom up
+  
+  -- Simplify by ignoring steps that can be completed by `rfl` (`eq.refl _`)
+  theorem append_assoc' (r s t : mylist α) : r ++ s ++ t = r ++ (s ++ t) :=
+    @mylist.rec_on α
+      (λ l, (l ++ s) ++ t = l ++ (s ++ t)) r
+      rfl
+      (λ a as, λ ih, (@eq.subst _ (λ φ, (a::as ++ s) ++ t = a::φ) _ _ ih rfl))
+
+end mylist
 
 --------------------------------------------------------------------------------
 -- **Definitions**

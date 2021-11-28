@@ -1,4 +1,12 @@
 /-
+**Useful resources:**
+
+* Theorem Proving in Lean: https://leanprover.github.io/theorem_proving_in_lean/
+* Mario Carneiro's thesis: https://github.com/digama0/lean-type-theory/releases
+* The HoTT Book: https://homotopytypetheory.org/book/
+-/
+
+/-
 "Expressions" are formally strings (or "trees") of symbols.
 Every expression **has a unique "type"**, which is **also an expression**. (The uniqueness is guaranteed by the "typing rules".)
 You may imagine there is a "typing function" that maps all expressions to a subset of expressions.
@@ -27,9 +35,6 @@ A expression is *well-formed* if and only if it can be *assigned a type* accordi
 * With different lists of assumptions, the set of well-formed expressions varies.
 -/
 
--- (Refer to: *The HoTT Book*, Appendix A)
--- (Refer to: Mario Carneiro's thesis on Lean's type theory)
-
 --------------------------------------------------------------------------------
 -- **Structural rules**
 -- (universe axioms, well-formed contexts, parameter, weakening)
@@ -39,7 +44,7 @@ universe u -- "The identifier `u` now denotes a 'universe level' (i.e. `Type u` 
 -- Check if an expression is well-formed (given the current context Γ) and output their type
 -- Syntax: `#check <expr>`
 #check Type u -- `Γ ⊢ (Type u : Type (u+1))` by U-formation rule
-#check Prop   -- `Γ ⊢ (Prop : Type 0)` by Prop-formation rule (Lean only)
+#check Prop   -- `Γ ⊢ (Prop : Type 0)` by "Prop-formation" rule (Lean only)
 
 section -- "Push context (i.e. the list of assumptions)"
 
@@ -635,7 +640,7 @@ section
   #check zero.succ.succ.succ.succ -- Syntax for abbreviating
 end
 
--- (Refer to: https://leanprover.github.io/reference/declarations.html#inductive-types)
+-- See: https://leanprover.github.io/reference/declarations.html#inductive-types
 -- In general, the "inductive-formation" rule is used by the `inductive` keyword:
 /-
 `inductive <type-name> [parameters i.e. additional hypotheses...] : Sort <level>`
@@ -765,7 +770,7 @@ def mynat_add : mynat → mynat → mynat :=
     x                    -- The `zero` case (`x + 0` should be `x`)
     (λ r, λ xr, xr.succ) -- The `succ` case (`x + succ r` should be `succ (x + r)`)
 
--- (Refer to: https://leanprover.github.io/reference/declarations.html#inductive-types)
+-- See: https://leanprover.github.io/reference/declarations.html#inductive-types
 -- In general, the "inductive-elimination" rule is used by the `rec` method:
 /-
 `@<type-name>.rec [parameters i.e. additional hypotheses...]`
@@ -954,6 +959,7 @@ Lean treats indices of the family differently from parameters of the type former
 -/
 
 -- Example: arithmetic expression
+-- (cf. https://discord.com/channels/679792285910827018/679792285910827027/914149048016048148)
 inductive Expr : Type → Type 1
 | I   : ℤ                             → Expr ℤ
 | B   : bool                          → Expr bool
@@ -999,7 +1005,7 @@ section
   #check @myeq'.refl ℕ 3 -- `myeq' 3 3`
 end
 
--- (Refer to: https://leanprover.github.io/reference/declarations.html#inductive-families)
+-- See: https://leanprover.github.io/reference/declarations.html#inductive-families
 -- In general, the "inductive-formation" rule is used by the `inductive` keyword:
 /-
 `inductive <family-name> [parameters...] : Π(...), ..., Π (...), Sort <level>`
@@ -1139,8 +1145,8 @@ def myeq_trans : Π {α : Sort u} {x y z : α} (h₁ : myeq x y) (h₂ : myeq y 
     (λ a, id)                       -- Now given `myeq a a` (implicit), prove `myeq x a → myeq x a`
       y z h₂ h₁                     -- Then we could specialise `l` `r` to `y` `z`, and give a `myeq y z` to...
 
--- (The "implicit" means that you could construct an instance from the given arguments and the constructor `refl`,
---  so there is no point in giving you an instance in addition to those arguments...)
+-- (The "implicit" means that you could construct an instance from the given `a` and the constructor `refl`,
+--  so there is no point in giving you an instance in addition to `a`...)
 
 section
   variables x y : ℕ
@@ -1182,7 +1188,7 @@ end
 
 -- TODO: get used to it! (Induction to produce `Prop`, and "constructions generalising over non-existent cases"...)
 
--- (Refer to: https://leanprover.github.io/reference/declarations.html#inductive-families)
+-- See: https://leanprover.github.io/reference/declarations.html#inductive-families
 -- TODO: make clear about the constraints
 -- In general, the "inductive-elimination" rule is used by the `rec` method:
 /-
@@ -1200,7 +1206,7 @@ plus the new terms produced by "recursive calls" (if the corresponding construct
 Special case: if the inductive type lives in `Prop`, the `λ(x : <family-name...> [indices])` part in the motive
 will vanish (proof irrelevance?), and the motive could only return a `Prop`!
 
-(Special case in special case: singleton elimination, as in our `myeq`s)
+(Special case in special case: singleton elimination, as in our `myeq`s...)
 -/
 
 
@@ -1286,7 +1292,7 @@ The last two constructors are dependently typed:
 --   Σ (dependent pair), respectively.
 
 /-
-For the introduction / elimination rules for these types, refer to:
+For the introduction / elimination rules for these types, see:
 
 * https://leanprover.github.io/logic_and_proof/
 * https://leanprover.github.io/theorem_proving_in_lean/propositions_and_proofs.html

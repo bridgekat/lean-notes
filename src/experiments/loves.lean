@@ -1,5 +1,8 @@
 -- See: https://leanprover.github.io/logic_and_proof/first_order_logic_in_lean.html
 
+-- My "hello, world" in Lean
+-- Here "love" refers to romantic attraction only
+
 constant Person : Type
   -- Domain of discourse
 
