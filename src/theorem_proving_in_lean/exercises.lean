@@ -512,38 +512,38 @@ inductive myeq {α : Sort u} (l : α) : α → Prop
 
 namespace myeq
 
-  lemma myeq_symm : Π {α : Sort u} {x y : α} (h : myeq x y), myeq y x :=
+  lemma symm : Π {α : Sort u} {x y : α} (h : myeq x y), myeq y x :=
     λ α x y h, @myeq.rec α x -- The subject is `myeq {α} x`
       (λ r, myeq r x) -- Make a more general claim: given `myeq x r` then `myeq r x`
       (myeq.refl x)   -- Now given `myeq x x` (implicit), prove `myeq x x`
         y h           -- Then we could specialise `r` to `y`, and give a `myeq x y` to make `myeq y x`
   
-  lemma myeq_trans : Π {α : Sort u} {x y z : α} (h₁ : myeq x y) (h₂ : myeq y z), myeq x z :=
+  lemma trans : Π {α : Sort u} {x y z : α} (h₁ : myeq x y) (h₂ : myeq y z), myeq x z :=
     λ α x y z h₁ h₂, @myeq.rec α y -- The subject is `myeq {α} y`
       (λ r, myeq x r) -- Make a more general claim: given `myeq y r` then `myeq x r`
       h₁              -- Now given `myeq y y` (implicit), prove `myeq x y`
         z h₂          -- Then we could specialise `r` to `z`, and give a `myeq y z` to make `myeq x z`
   
-  lemma myeq_congr : Π {α β : Sort u} {x y : α} (f : α → β) (h : myeq x y), myeq (f x) (f y) :=
+  lemma congr : Π {α β : Sort u} {x y : α} (f : α → β) (h : myeq x y), myeq (f x) (f y) :=
     λ α β x y f h, @myeq.rec α x
       (λ r, myeq (f x) (f r))
       (myeq.refl (f x))
         y h
   
-  lemma myeq_subst : Π {α : Sort u} {x y : α} (p : α → Prop) (h₁ : myeq x y) (h₂ : p x), p y :=
+  lemma subst : Π {α : Sort u} {x y : α} (p : α → Prop) (h₁ : myeq x y) (h₂ : p x), p y :=
     λ α x y p h₁ h₂, @myeq.rec α x
       (λ r, p r)
       h₂
         y h₁
   
   -- Simplify by removing `@` and abbreviating arguments
-  lemma myeq_symm' {α : Sort u} {x y : α} (h : myeq x y) : myeq y x :=
+  lemma symm' {α : Sort u} {x y : α} (h : myeq x y) : myeq y x :=
     myeq.rec (myeq.refl x) h
-  lemma myeq_trans' {α : Sort u} {x y z : α} (h₁ : myeq x y) (h₂ : myeq y z) : myeq x z :=
+  lemma trans' {α : Sort u} {x y z : α} (h₁ : myeq x y) (h₂ : myeq y z) : myeq x z :=
     myeq.rec h₁ h₂
-  lemma myeq_congr' {α β : Sort u} {x y : α} (f : α → β) (h : myeq x y) : myeq (f x) (f y) :=
+  lemma congr' {α β : Sort u} {x y : α} (f : α → β) (h : myeq x y) : myeq (f x) (f y) :=
     myeq.rec (myeq.refl (f x)) h
-  lemma myeq_subst' {α : Sort u} {x y : α} (p : α → Prop) (h₁ : myeq x y) (h₂ : p x) : p y :=
+  lemma subst' {α : Sort u} {x y : α} (p : α → Prop) (h₁ : myeq x y) (h₂ : p x) : p y :=
     myeq.rec h₂ h₁
 
 end myeq
@@ -672,7 +672,7 @@ namespace mylist
     @mylist.rec_on α
       (λ l, l ++ nil = l) t
       (eq.refl nil)
-      (λ a as, λ ih, (@eq.subst _ (λ φ, a::as ++ nil = a::φ) _ _ ih (eq.refl _)))
+      (λ a as, λ ih, (@eq.subst _ (λ x, a::as ++ nil = a::x) _ _ ih (eq.refl _)))
   
   -- Tip: have a notepad open, keep track of the current "state"...
   theorem append_assoc (r s t : mylist α) : r ++ s ++ t = r ++ (s ++ t) :=
@@ -680,9 +680,9 @@ namespace mylist
       (λ l, (l ++ s) ++ t = l ++ (s ++ t)) r
       (eq.refl (s ++ t))
       (λ a as, λ ih,
-        (@eq.subst _ (λ φ, (a::as ++ s) ++ t = a::φ) _ _ ih
-          (@eq.subst _ (λ φ, (a::as ++ s) ++ t = φ) _ _ (cons_append a (as ++ s) t)
-            (@eq.subst _ (λ φ, (a::as ++ s) ++ t = φ ++ t) _ _ (cons_append a as s)
+        (@eq.subst _ (λ x, (a::as ++ s) ++ t = a::x) _ _ ih
+          (@eq.subst _ (λ x, (a::as ++ s) ++ t = x) _ _ (cons_append a (as ++ s) t)
+            (@eq.subst _ (λ x, (a::as ++ s) ++ t = x ++ t) _ _ (cons_append a as s)
               (eq.refl ((a::as ++ s) ++ t)))))) -- Read bottom up
   
   -- Simplify by ignoring steps that can be completed by `rfl` (`eq.refl _`)
@@ -690,80 +690,249 @@ namespace mylist
     @mylist.rec_on α
       (λ l, (l ++ s) ++ t = l ++ (s ++ t)) r
       rfl
-      (λ a as, λ ih, (@eq.subst _ (λ φ, (a::as ++ s) ++ t = a::φ) _ _ ih rfl))
+      (λ a as, λ ih, (@eq.subst _ (λ x, (a::as ++ s) ++ t = a::x) _ _ ih rfl))
 
 end mylist
-
---------------------------------------------------------------------------------
--- **Definitions**
 
 inductive mynat : Type
 | zero :                mynat
 | succ : Π (n : mynat), mynat
 
-open mynat
+namespace mynat
+  def one   : mynat := zero.succ
+  def two   : mynat := zero.succ.succ
+  def three : mynat := zero.succ.succ.succ
 
-def one   : mynat := zero.succ
-def two   : mynat := zero.succ.succ
-def three : mynat := zero.succ.succ.succ
+  -- `mynat.rec` is primitive recursion!
 
--- Addition
-def add : mynat → mynat → mynat :=
-  λ a, @mynat.rec
-    (λ r, mynat)
-    a
-    (λ r, λ ar, succ ar)
+  def add : mynat → mynat → mynat :=
+    λ a, @mynat.rec
+      (λ r, mynat)
+      a
+      (λ r, λ ar, succ ar)
 
-#reduce add one two
+  #reduce add one two
 
--- Multiplication
-def mul : mynat → mynat → mynat :=
-  λ a, @mynat.rec
-    (λ r, mynat)
-    zero
-    (λ r, λ ar, add ar a)
+  def mul : mynat → mynat → mynat :=
+    λ a, @mynat.rec
+      (λ r, mynat)
+      zero
+      (λ r, λ ar, add ar a)
 
-#reduce mul two three
-#reduce mul three two
+  #reduce mul two three
+  #reduce mul three two
 
--- Predecessor
-def pred : mynat → mynat :=
-  @mynat.rec
-    (λ r, mynat)
-    zero
-    (λ r, λ predr, r)
+  def pred : mynat → mynat :=
+    @mynat.rec
+      (λ r, mynat)
+      zero
+      (λ r, λ predr, r)
 
-#reduce pred zero
-#reduce pred one
-#reduce pred two
-#reduce pred three
+  #reduce pred zero
+  #reduce pred one
+  #reduce pred two
+  #reduce pred three
 
--- Truncated subtraction
-def monus : mynat → mynat → mynat :=
-  λ a, @mynat.rec
-    (λ r, mynat)
-    a
-    (λ r, λ ar, pred ar)
+  def monus : mynat → mynat → mynat :=
+    λ a, @mynat.rec
+      (λ r, mynat)
+      a
+      (λ r, λ ar, pred ar)
 
-#reduce monus three two
-#reduce monus two three
+  #reduce monus three two
+  #reduce monus two three
 
--- Exponentiation
-def pow : mynat → mynat → mynat :=
-  λ a, @mynat.rec
-    (λ _, mynat)
-    one
-    (λ r, λ ar, mul ar a)
+  def pow : mynat → mynat → mynat :=
+    λ a, @mynat.rec
+      (λ _, mynat)
+      one
+      (λ r, λ ar, mul ar a)
 
-#reduce pow two three
-#reduce pow three two
+  #reduce pow two three
+  #reduce pow three two
 
---------------------------------------------------------------------------------
--- **Theorems**
+  lemma add_zero : Π (a : mynat), add a zero = a :=
+    λ a, rfl
 
+  lemma add_succ : Π (a b : mynat), add a (succ b) = succ (add a b) :=
+    λ a b, rfl
 
+  -- More manual equational rewriting...
+  lemma succ_add : Π (a b : mynat), add (succ a) b = succ (add a b) :=
+    λ a b, @mynat.rec_on
+      (λ n, add (succ a) n = succ (add a n)) b
+      rfl
+      (λ n, λ ih,
+        (@eq.subst _ (λ x, add (succ a) (succ n) = succ x) _ _ ih
+          (eq.refl (add (succ a) (succ n)))))
 
+  lemma zero_add : Π (a : mynat), add zero a = a :=
+    λ a, @mynat.rec_on
+      (λ n, add zero n = n) a
+      rfl
+      (λ n, λ ih,
+        (@eq.subst _ (λ x, succ (add zero n) = succ x) _ _ ih
+          (eq.refl (succ (add zero n)))))
 
+  lemma add_comm : Π (a b : mynat), add a b = add b a :=
+    λ a b, @mynat.rec_on
+      (λ n, add a n = add n a) b
+      (eq.symm (zero_add a))
+      (λ n, λ ih,
+        (@eq.subst _ (λ x, succ (add a n) = x) _ _ (eq.symm (succ_add n a))
+          (@eq.subst _ (λ x, succ (add a n) = succ x) _ _ ih
+            (eq.refl (succ (add a n))))))
+
+  -- See: https://leanprover.zulipchat.com/#narrow/streams/public/search/stupid.20triangle
+  #print notation ▸
+
+  -- `rw` is incredible...!
+  lemma add_comm' : Π (a b : mynat), add a b = add b a :=
+  begin
+    intros a b,
+    induction b with b ih,
+    { rw zero_add, refl, },
+    { rw [succ_add, ← ih], refl, },
+  end
+
+  -- This will lead to the Natural Number Game...
+  -- https://github.com/ImperialCollegeLondon/natural_number_game/
+  
+  -- Also see: Part 7 of *Logic and Structures* (van Dalen)
+end mynat
+
+namespace mylist
+  variable {α : Type u}
+
+  def length : mylist α → ℕ :=
+    λ l, mylist.rec 0 (λ _ _, λ (l' : ℕ), l'.succ) l
+  
+  def reverse : mylist α → mylist α :=
+    λ l, mylist.rec nil (λ a l, λ l', l' ++ (cons a nil)) l
+  
+  #reduce length [1, 2, 3, 4, 5]
+  #reduce reverse [1, 2, 3, 4, 5]
+
+  -- Even more manual equational rewriting...
+  lemma length_append : Π (s t : mylist α), length (s ++ t) = length s + length t :=
+    λ s t, @mylist.rec_on α
+      (λ l, length (l ++ t) = length l + length t) s
+      (eq.symm (nat.zero_add t.length))
+      (λ a l, λ ih,
+        (@eq.subst _ (λ x, length (a::l ++ t) = x) _ _ (eq.symm (nat.succ_add (length l) (length t)))
+          (@eq.subst _ (λ x, length (a::l ++ t) = nat.succ x) _ _ ih
+            (@eq.subst _ (λ x, length (a::l ++ t) = length x) _ _ (cons_append a l t)
+              (eq.refl (a::l ++ t).length)))))
+
+  lemma length_reverse : Π (t : mylist α), length (reverse t) = length t :=
+    λ t, @mylist.rec_on α
+      (λ l, length (reverse l) = length l) t
+      rfl
+      (λ a l, λ ih,
+        (@eq.subst _ (λ x, x = (a::l).length) _ _ (eq.symm (length_append l.reverse [a]))
+          (@eq.subst _ (λ x, nat.succ x = (a::l).length) _ _ (eq.symm ih)
+            (eq.refl (a::l).length))))
+
+  lemma append_reverse_eq_reverse_append : Π (s t : mylist α), reverse (s ++ t) = reverse t ++ reverse s :=
+    λ s t, @mylist.rec_on α
+      (λ x, reverse (x ++ t) = reverse t ++ reverse x) s
+      (@eq.subst _ (λ x, reverse t = x) _ _ (eq.symm (append_nil t.reverse)) (eq.refl t.reverse))
+      (λ a l, λ ih,
+        (@eq.subst _ (λ x, reverse (a::l ++ t) = x) _ _ (append_assoc t.reverse l.reverse [a])
+          (@eq.subst _ (λ x, reverse (a::l ++ t) = x ++ [a]) _ _ ih
+            (@eq.subst _ (λ x, reverse (a::l ++ t) = reverse x) _ _ (cons_append a l t)
+              (eq.refl (a::l ++ t).reverse)))))
+
+  lemma reverse_reverse_eq_self : Π (t : mylist α), reverse (reverse t) = t :=
+    λ t, @mylist.rec_on α
+      (λ x, reverse (reverse x) = x) t
+      rfl
+      (λ a l, λ ih,
+        (@eq.subst _ (λ x, (a::l).reverse.reverse = [a] ++ x) _ _ ih
+          (@eq.subst _ (λ x, (a::l).reverse.reverse = x) _ _ (append_reverse_eq_reverse_append l.reverse [a])
+            (eq.refl (a::l).reverse.reverse))))
+
+end mylist
+
+inductive arith_expr : Type
+| const : ℕ →                       arith_expr
+| var   : ℕ →                       arith_expr
+| plus  : arith_expr → arith_expr → arith_expr
+| times : arith_expr → arith_expr → arith_expr
+
+namespace arith_expr
+  #check const 2
+  #check var 5
+  #check plus (const 2) (var 0)
+
+  -- TODO: variable assignment
+  def eval : arith_expr → ℕ := sorry
+
+end arith_expr
+
+inductive boolean_expr : Type
+| const : bool →                        boolean_expr
+| var   : ℕ →                           boolean_expr
+| not   : boolean_expr →                boolean_expr
+| and   : boolean_expr → boolean_expr → boolean_expr
+| or    : boolean_expr → boolean_expr → boolean_expr
+
+namespace boolean_expr
+  #check const tt
+  #check var 5
+  #check and (const ff) (var 0)
+
+  -- TODO: variable assignment
+  def eval : boolean_expr → ℕ := sorry
+
+  def size : boolean_expr → ℕ :=
+    λ e, @boolean_expr.rec_on (λ _, ℕ) e
+      (λ _, 1)
+      (λ _, 1)
+      (λ e', λ ne', ne' + 1)
+      (λ e1 e2, λ ne1 ne2, ne1 + ne2 + 1)
+      (λ e1 e2, λ ne1 ne2, ne1 + ne2 + 1)
+
+  def depth : boolean_expr → ℕ :=
+    λ e, @boolean_expr.rec_on (λ _, ℕ) e
+      (λ _, 1)
+      (λ _, 1)
+      (λ e', λ ne', ne' + 1)
+      (λ e1 e2, λ ne1 ne2, max ne1 ne2 + 1)
+      (λ e1 e2, λ ne1 ne2, max ne1 ne2 + 1)
+  
+  #reduce size  (and (or (const tt) (not (var 0))) (not (var 2)))
+  #reduce depth (and (or (const tt) (not (var 0))) (not (var 2)))
+
+  def replace_all : boolean_expr → ℕ → boolean_expr → boolean_expr :=
+    λ sub ind e, @boolean_expr.rec_on (λ _, boolean_expr) e
+      (λ b, const b)
+      (λ v, ite (v = ind) sub (var v)) -- TODO: make clear: decidable_eq
+      (λ _, λ e', not e')
+      (λ _ _, λ e1' e2', and e1' e2')
+      (λ _ _, λ e1' e2', or e1' e2')
+
+  #reduce replace_all
+    (const ff)
+    2
+    (and (or (const tt) (not (var 0))) (not (var 2)))
+
+end boolean_expr
+
+inductive even_odd : bool → ℕ → Prop
+| even_zero :                            even_odd ff 0
+| even_succ : Π {n : ℕ}, even_odd ff n → even_odd tt n.succ
+| odd_succ  : Π {n : ℕ}, even_odd tt n → even_odd ff n.succ
+
+namespace even_odd
+  #check even_zero
+  #check even_succ even_zero
+  -- Does not typecheck
+  -- #check even_succ (even_succ even_zero)
+  -- Typechecks
+  #check odd_succ (even_succ even_zero)
+  #check (even_succ ∘ odd_succ ∘ even_succ ∘ odd_succ ∘ even_succ) even_zero
+end even_odd
 
 end exercise_7
 

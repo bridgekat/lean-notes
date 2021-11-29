@@ -1,11 +1,20 @@
 /-
 **Useful resources:**
 
+* The Natural Number Game: https://www.ma.imperial.ac.uk/~buzzard/xena/natural_number_game/
+* Logic and Proof: https://leanprover.github.io/logic_and_proof/
+* Logic worksheets: https://github.com/ImperialCollegeLondon/M40001_lean/tree/master/src/2021
+
+Here we proceed to the "advanced level":
+
 * Theorem Proving in Lean: https://leanprover.github.io/theorem_proving_in_lean/
-* Mario Carneiro's thesis: https://github.com/digama0/lean-type-theory/releases
+* Mario Carneiro's thesis: https://github.com/digama0/lean-type-theory/releases/
 * The HoTT Book: https://homotopytypetheory.org/book/
+* Programming in Lean: https://leanprover.github.io/programming_in_lean/programming_in_lean.pdf
+* Lean Zulip chat: https://leanprover.zulipchat.com/
 -/
 
+--------------------------------------------------------------------------------
 /-
 "Expressions" are formally strings (or "trees") of symbols.
 Every expression **has a unique "type"**, which is **also an expression**. (The uniqueness is guaranteed by the "typing rules".)
@@ -37,7 +46,7 @@ A expression is *well-formed* if and only if it can be *assigned a type* accordi
 
 --------------------------------------------------------------------------------
 -- **Structural rules**
--- (universe axioms, well-formed contexts, parameter, weakening)
+-- (universe axioms, well-formed contexts, variable, weakening)
 
 universe u -- "The identifier `u` now denotes a 'universe level' (i.e. `Type u` will now be a well-formed universe)"
 
