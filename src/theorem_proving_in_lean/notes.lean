@@ -779,6 +779,8 @@ def mynat_add : mynat → mynat → mynat :=
     x                    -- The `zero` case (`x + 0` should be `x`)
     (λ r, λ xr, xr.succ) -- The `succ` case (`x + succ r` should be `succ (x + r)`)
 
+#reduce mynat_add mynat.zero.succ.succ mynat.zero.succ -- 1 + 2 = 3
+
 -- See: https://leanprover.github.io/reference/declarations.html#inductive-types
 -- In general, the "inductive-elimination" rule is used by the `rec` method:
 /-
@@ -857,17 +859,6 @@ inductive option (α : Type u) : Type u
 inductive inhabited (α : Type u) : Type u
 | mk : α → inhabited
 
-def compose {α β γ : Type*} (f : β → option γ) (g : α → option β) (x : α) : option γ :=
-  option.cases_on (g x) option.none f
-
--- set_option pp.all true
-
-def is_even (x : ℕ) : bool := nat.rec_on x bool.tt (λ _, @bool.rec (λ _, bool) bool.tt bool.ff)
-
-def filter (x : ℕ) : option ℕ := bool.cases_on (is_even x) (option.some x.succ) option.none
-
-#reduce (compose filter filter) 0
-
 
 -- TODO: how are the allowed universe levels determined for `inductive`...?
 -- See: https://leanprover.github.io/theorem_proving_in_lean/inductive_types.html#axiomatic-details
@@ -878,11 +869,6 @@ inductive mysubtype {α : Sort u} (p : α → Prop) : Sort u
 #check @subtype -- `Π {α : Sort u_1}, (α → Prop) → Sort (max 1 u_1)`
 #check @Exists  -- `Π {α : Sort u_1}, (α → Prop) → Prop`
 -- "Subtype is inhabited -- the element satisfying the predicate is found -- the existential statement has a proof"
-
-def add : ℕ → ℕ → ℕ := λ (n : ℕ), @nat.rec (λ _, ℕ) (n) (λ m add', add'.succ)
-#reduce add 12 22
-
-
 
 end hidden
 
@@ -986,7 +972,7 @@ section
 end
 
 -- Example: equality (symmetric version)
--- https://xenaproject.wordpress.com/2021/04/18/induction-on-equality/
+-- See: https://xenaproject.wordpress.com/2021/04/18/induction-on-equality/
 inductive myeq {α : Sort u} : α → α → Prop
 | refl : Π (a : α), myeq a a
 
@@ -1135,6 +1121,7 @@ end
 using `myeq.refl a` for some `a` (which generates a term of type `myeq a a`)!
 So in order to make a proof of the goal `myeq (tmpl l) (tmpl r)` for every `myeq l r`,
 we only need to make a proof of the goal `myeq (tmpl a) (tmpl a)` for any given `myeq a a`..."
+(TODO: the "diagonal" intuition)
 -/
 def myeq_congr : Π {α β : Sort u} (tmpl : α → β) (x y : α) (h : myeq x y), myeq (tmpl x) (tmpl y) :=
   λ α β tmpl x y h, @myeq.rec α     -- The subject is `myeq {α}`
@@ -1196,6 +1183,7 @@ section
 end
 
 -- TODO: get used to it! (Induction to produce `Prop`, and "constructions generalising over non-existent cases"...)
+-- (Maybe `elim` is a better name for `rec`...? Not all inductive types are "inductive" anyway!)
 
 -- See: https://leanprover.github.io/reference/declarations.html#inductive-families
 -- TODO: make clear about the constraints
@@ -1217,6 +1205,159 @@ will vanish (proof irrelevance?), and the motive could only return a `Prop`!
 
 (Special case in special case: singleton elimination, as in our `myeq`s...)
 -/
+
+
+--------------------------------------------------------------------------------
+-- Derived rule: **inductive-no-confusion**
+
+-- Let's think back to our `mynat` type...
+-- The type former
+#print mynat
+-- The constructors
+#print mynat.zero
+#print mynat.succ
+-- The eliminator
+#print mynat.rec
+-- These are the only "axioms"!
+
+-- Problem: how do we prove PA3 (`succ_ne_zero`) and PA4 (`succ_inj`)?
+-- See: https://home.sandiego.edu/~shulman/papers/induction.pdf (page 85)
+-- See: https://xenaproject.wordpress.com/2018/03/24/no-confusion-over-no_confusion/
+namespace mynat
+
+  -- Proving PA3 using the method described in the slides...
+  lemma make_contradiction : Π (f : mynat → Prop) (n m : mynat)
+    (h₁ : f n = false) (h₂ : f m = true) (h : n = m),
+    false :=
+      λ f n m h₁ h₂ h,
+        @eq.rec_on _ _ (λ x : Prop, x) _ ((h₂ ▸ h ▸ h₁) : true = false) trivial
+
+  theorem succ_ne_zero : Π (n : mynat), succ n ≠ zero :=
+    λ n h, make_contradiction
+      (λ x, mynat.rec_on x true (λ _, λ _, false)) -- This function represents "x is zero"
+      (succ n) zero
+      rfl -- "(succ n) is zero" is `false` by definition
+      rfl -- "zero is zero"     is `true`  by definition
+      h   -- "(succ n) = zero"
+
+  -- This above strategy should work for *all* inductive types and families:
+  -- "If `a` and `b` are constructed using two different constructors, we could
+  --  *define a function* that *yields different values* for that two constructors!
+  --  In this way, we are able to distinguish `a` and `b`."
+
+  -- Now prove PA4...
+  def pred : Π (n : mynat), mynat :=
+    λ n, @mynat.rec_on (λ _, mynat) n
+      zero
+      (λ x, λ _, x)
+  -- The "predecessor" function can be seen as a means to "extract out what went into
+  --  the constructor `succ`"! (If `n` is not constructed from `succ`, return an arbitrary value)
+
+  theorem succ_inj : Π (n m : mynat), succ n = succ m → n = m :=
+    λ n m h, @eq.subst _ (λ x, pred (succ n) = pred x) _ _ h (eq.refl (pred (succ n)))
+  -- We just prove `pred (succ n) = pred (succ m)`, which is defeq to `n = m`
+
+  -- This above strategy sometimes does not work; consider `option`...
+  -- When trying to define the "extractor" function for `some`, we found it impossible to
+  -- define it for the `none` case. (Consider `extract (none : option empty)`!)
+
+  -- (TODO: complete)
+
+end mynat
+
+/-
+[MAYBE WRONG WAY?]
+
+namespace option
+
+  -- Possible solution: make the "extractor" dependently-typed!
+  def extract_type : Π {α : Type} (a : option α), Type :=
+    λ α a, option.rec_on a
+      unit      -- `none` case: don't care
+      (λ _, α)  -- `some` case: extracts the thing
+  
+  def extract : Π {α : Type} (a : option α), extract_type a :=
+    λ α a, option.rec_on a
+      unit.star -- `none` case: don't care
+      (λ x, x)  -- `some` case: extracts the thing
+
+  #reduce extract_type (some 1)
+  #reduce extract_type (some 2)
+  -- #check extract (some 1) = extract (some 2) -- Oops, does not typecheck (TODO: because defeq is not transitive?)
+  #check @eq ℕ (extract (some 1)) (extract (some 2))
+
+  -- theorem some_inj : Π {α : Type} (a b : α), some a = some b → a = b :=
+  --   λ α a b h, @eq.subst _ (λ x, @eq α (extract (some a)) (extract x)) _ _ h (eq.refl (extract (some a)))
+  -- (Oops, does not typecheck!)
+
+  -- (TODO: complete)
+
+end option
+-/
+
+/-
+For the naturals, PA3 and PA4 ensure that every time you apply `succ` on an existing natural,
+you are guaranteed to make a "new" natural, different from everything below. Two naturals `m` and `n` are equal iff:
+
+* They are both `zero` or both made from `succ`;
+* If `m` is made from `succ m'` and `n` from `succ n'`, then `m'` and `n'` are equal.
+
+We could generalise this idea to *all inductive types and families*: two objects `a` and `b` are equal iff:
+
+* They are made from the same constructor.
+* Moreover, the arguments sent into the constructor are equal.
+
+The "if" direction is just `eq.refl`. We call the "only if" direction: "no_confusion".
+Given a hypothesis `h : a = b`, the "no_confusion" lemma should:
+
+* Provide a proof of `false` if `a` and `b` are not constructed from the same constructor;
+* Provide a proof of `a1 = b1 ∧ ... ∧ ak = bk` if `a` and `b` are constructed from the same constructor with k parameters.
+
+To avoid using non-primitive notions such as `false` and `∧`, we could require a arbitrary proposition `P` to be sent into "no_confusion";
+And the "no_confusion" lemma should:
+
+* Provide a proof of `P` if `a` and `b` are not constructed from the same constructor;
+* Provide a proof of `(a1 = b1 → ... → ak = bk → P) → P` if `a` and `b` are constructed from the same constructor with k parameters.
+
+The above two formulations are equivalent. The second one is almost exactly what `no_confusion_type` declares!
+(It allows `P` to be in any `Sort`, though...)
+-/
+
+section
+  parameter P : Prop
+
+  #reduce mynat.no_confusion_type P (mynat.zero) (mynat.zero.succ)
+  #reduce mynat.no_confusion_type P (mynat.zero.succ) (mynat.zero.succ)
+
+  #reduce Expr.no_confusion_type P (Expr.I 1) (Expr.Add (Expr.I 1) (Expr.I 2))
+  #reduce Expr.no_confusion_type P (Expr.Add (Expr.I 10) (Expr.I 20)) (Expr.Add (Expr.I 1) (Expr.I 2))
+end
+
+-- Now we try to prove the "no_confusion" lemmata for `mynat` and `tree`:
+
+namespace mynat
+  lemma my_no_confusion : Π {P : Sort u} {n m : mynat}
+    (h : n = m),
+    mynat.no_confusion_type P n m :=
+      λ P n m h, @eq.rec_on mynat n              -- Eliminating `eq` first makes the proof shorter
+        (λ r, mynat.no_confusion_type P n r) m h -- Target type and specialisation
+        (mynat.cases_on n                        -- The `refl` case
+          (λ hp, hp)                             -- * The `zero` case: target type is P → P
+          (λ n' hp, hp rfl))                     -- * The `succ` case: target type is (n' = n' → P) → P
+end mynat
+
+namespace tree
+  lemma my_no_confusion : Π {α : Type} {P : Sort u} {a b : tree α}
+    (h : a = b),
+    tree.no_confusion_type P a b :=
+      λ α P a b h, @eq.rec_on (tree α) a         -- Eliminating `eq` first makes the proof shorter
+        (λ r, tree.no_confusion_type P a r) b h  -- Target type and specialisation
+        (tree.cases_on a                         -- The `refl` case
+          (λ x hp, hp rfl)                       -- * The `leaf` case: target type is (x = x → P) → P
+          (λ l x r hp, hp rfl rfl rfl))          -- * The `node` case: target type is (l = l → x = x → r = r → P) → P
+end tree
+
+-- TODO: using `no_confusion` and `inj` ("wrapper")
 
 
 end inductive_families
@@ -1253,7 +1394,7 @@ end judgmental_equality
 def foo := (let a := nat in λ x : a, x + 2)
 -- def bar := (λ α, λ x : α, x + 2) nat -- Does not typecheck
 
--- TODO: check screenshots
+-- TODO: check screenshots & bookmarks
 
 -- TODO: review
 
@@ -1431,29 +1572,3 @@ section
 end
 
 end subtypes
-
-#check (eq ℕ)
-
-#check @ite
-
-inductive mylist (α : Type*)
-| nil {} : mylist
-| cons   : α → mylist → mylist
-
-#check mylist.nil
-
-/-
-inductive my_and (α : Type) (β : Type) : Type
-| intro : Type → Type → my_and
-
-#check my_and.intro true true
--/
-
-#check and true true
-
-#check and
-#check eq ℕ
-#check Type → Prop
-#check Π (x : Prop) (y : Prop), Prop
-#check Π (α : Type) (a : α), Prop
-
