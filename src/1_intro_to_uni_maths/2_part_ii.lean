@@ -56,10 +56,68 @@ local notation `ℕ` : 1024 := mynat
 --------------------------------------------------------------------------------
 -- # Natural Numbers
 
+namespace mynat
+
+section
+  variables {x y z : ℕ}
+
+  theorem add_assoc :
+    (x + y) + z = x + (y + z)
+  :=
+  begin
+    induction z with z ih,
+    { refl },
+    { change (x + y + z).succ = (x + (y + z)).succ,
+      rw ih }
+  end
+
+  theorem zero_add :
+    zero + x = x
+  :=
+  begin
+    induction x with x ih,
+    { refl },
+    { change (zero + x).succ = x.succ,
+      rw ih, }
+  end
+
+  theorem add_comm :
+    x + y = y + x
+  :=
+  begin
+    induction y with y ihy generalizing x,
+    { rw zero_add, refl },
+    { induction x with x ihx,
+      { rw zero_add, refl },
+      { change (x.succ + y).succ = (y.succ + x).succ,
+        rw [← ihx, ihy],
+        change (y + x).succ.succ = (x + y).succ.succ,
+        rw ihy } }
+  end
+
+  theorem add_mul :
+    (x + y) * z = x * z + y * z
+  :=
+  begin
+    induction z with z ih,
+    { refl },
+    { change (x + y) * z + (x + y) = (x * z + x) + (y * z + y),
+      rw ih,
+      sorry /- TODO: "simp normal forms" -/ }
+  end
+
+-- TODO: complete the proofs
+
+end
+
+end mynat
 
 
 --------------------------------------------------------------------------------
 -- # Integers
+
+
+
 
 
 

@@ -165,26 +165,28 @@ end
 -- # Relations
 
 section
+  variable r : X → X → Prop
 -- Definitions.
-  def reflexive (r : X → X → Prop) : Prop :=
+  def reflexive : Prop :=
     ∀ (a : X), r a a
-  def symmetric (r : X → X → Prop) : Prop :=
+  def symmetric : Prop :=
     ∀ {a b : X}, r a b → r b a
-  def antisymmetric (r : X → X → Prop) : Prop :=
+  def antisymmetric : Prop :=
     ∀ {a b : X}, r a b → r b a → a = b
-  def transitive (r : X → X → Prop) : Prop :=
+  def transitive : Prop :=
     ∀ {a b c : X}, r a b → r b c → r a c
-  def total (r : X → X → Prop) : Prop :=
+  def total : Prop :=
     ∀ (a b : X), r a b ∨ r b a
 end
 
 section
+  variable r : X → X → Prop
 -- Definitions.
-  def is_partial_order (r : X → X → Prop) : Prop :=
+  def is_partial_order : Prop :=
     reflexive r ∧ antisymmetric r ∧ transitive r
-  def is_total_order (r : X → X → Prop) : Prop :=
+  def is_total_order : Prop :=
     reflexive r ∧ antisymmetric r ∧ transitive r ∧ total r
-  def is_equivalence_relation (r : X → X → Prop) : Prop :=
+  def is_equivalence_relation : Prop :=
     reflexive r ∧ symmetric r ∧ transitive r
 end
 
@@ -278,19 +280,17 @@ section
     { intros hxy,
       have h := (hrf x y).mp hxy,
       rw [hf, hf] at h,
-      have h' : r y y → r x y, {
-        change (λ (x : X), r y x) y → r x y,
+      have h' : r y y → r x y,
+      { change (λ (x : X), r y x) y → r x y,
         rw ← h,
-        exact id,
-      },
+        exact id, },
       exact h' (hrefl y), },
     { intros hxy,
-      have h : f x = f y, {
-        rw [hf, hf],
+      have h : f x = f y,
+      { rw [hf, hf],
         ext, split,
         { intros h, exact htrans (hsymm hxy) h, },
-        { intros h, exact htrans hxy h, },
-      },
+        { intros h, exact htrans hxy h, }, },
       exact (hrf x y).mpr h, },
   end
 -- ∎

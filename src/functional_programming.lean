@@ -165,7 +165,111 @@ end exercise_1
 
 section exercise_2
 
+-- **(1)**
 
+def add_digit : int → int → int :=
+  λ a b, a * 10 + b
+#eval add_digit 123 4
+
+-- **(2)**
+
+-- Using `meta` for `float`
+meta def celcius_to_fahrenheit : native.float → native.float :=
+  λ x, x * 9 / 5 + 32
+#eval celcius_to_fahrenheit 37
+
+-- **(3)**
+
+section
+  open native
+  meta structure vertex : Type :=
+    mk :: (x : float) (y : float)
+  meta def distance : vertex → vertex → float :=
+    λ ⟨x₀, y₀⟩ ⟨x₁, y₁⟩, ((x₀ - x₁) ^ 2 + (y₀ - y₁) ^ 2).sqrt
+  #eval distance (vertex.mk 0 1) (vertex.mk 2 2)
+end
+
+-- **(4)**
+
+section
+  open native
+
+  meta def triangle_area : vertex → vertex → vertex → float :=
+    λ v0 v1 v2,
+      let a := distance v0 v1,
+          b := distance v1 v2,
+          c := distance v2 v0,
+          s := (a + b + c) / 2
+      in (s * (s - a) * (s - b) * (s - c)).sqrt
+
+  #eval triangle_area ⟨0, 1⟩ ⟨1, 2⟩ ⟨2, 0⟩
+end
+
+-- **(5)**
+
+def is_prime : ℕ → bool :=
+  λ n, ite (n < 2) ff $
+    @nat.rec
+      (λ _, bool)
+      tt                                -- Define (f 0)
+      (λ i' f', let i := i'.succ in     -- Define (f i)
+        f' && ((i < 2) || (n % i ≠ 0)))
+    n.sqrt                              -- Evaluate (f n.sqrt)
+
+#eval is_prime 23
+
+-- **(6)**
+
+def myfact : ℕ → ℕ :=
+  nat.rec 1 (λ n' fact' : ℕ, n'.succ * fact')
+
+#eval myfact 10
+
+-- **(7)**
+
+def perm : ℕ → ℕ → ℕ :=
+  λ n r, ite (n < r) 0 $ ite (r = 0) 1 $
+    nat.rec
+      n
+      (λ i' acc', (n - i'.succ) * acc')
+    (r - 1)
+
+#eval perm 10 2
+#eval perm 6 3
+
+-- **(8)**
+
+-- `choose r r := 1`
+-- `choose n r := (choose (n - 1) r) * n / (n - r)`
+-- Should always be divisible
+def choose : ℕ → ℕ → ℕ :=
+  λ n r, ite (n < r) 0 $
+    nat.rec
+      1
+      (λ nr' acc', acc' * (nr'.succ + r) / (nr'.succ))
+    (n - r)
+
+#eval choose 22 12
+
+-- **(9)**
+
+-- Computes `a % b` (returns `a` when `b = 0`)
+def remainder : ℕ → ℕ → ℕ :=
+  λ a b,
+    nat.rec
+      a
+      (λ _ a', ite (a' < b) a' (a' - b))
+    a
+
+#eval remainder 20 7
+
+-- **(10)**
+-- **(11)**
+-- **(12)**
+-- **(13)**
+-- **(14)**
+-- **(15)**
+-- **(16)**
 
 end exercise_2
 
