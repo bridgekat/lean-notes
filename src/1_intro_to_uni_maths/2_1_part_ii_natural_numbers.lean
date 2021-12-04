@@ -8,7 +8,7 @@ universe u
 --------------------------------------------------------------------------------
 -- Definitions from the Natural Number Game
 
--- Definition as inductive type
+-- Definition of ℕ as an inductive type
 inductive mynat : Type
 | zero :         mynat
 | succ : mynat → mynat
@@ -42,12 +42,9 @@ namespace mynat
   | m (succ n) := pow m n * m
   instance : has_pow mynat mynat := ⟨pow⟩
 
--- Less or equal
+-- Less or equal than
   def le (m n : mynat) : Prop :=
     ∃ (v : mynat), n = m + v
-  -- Another choice is to define it recursively: 
-  -- | le 0 _               := true
-  -- | le (succ a) (succ b) := le a b
   instance : has_le mynat := ⟨mynat.le⟩
 
 -- Less than
@@ -57,11 +54,13 @@ namespace mynat
 
 end mynat
 
+-- Add this line in the beginning of each file to override the default ℕ
 local notation `ℕ` : 1024 := mynat
 
 namespace mynat
 
 -- Peano axioms (here they are all derived theorems!)
+-- For proving `no_confusion` with the recursor, refer to TPIL notes
   theorem succ_ne_zero : ∀ (n : ℕ), succ n ≠ 0 :=
     λ n h, mynat.no_confusion h
 
@@ -93,7 +92,7 @@ namespace mynat
 section
   variables (x y z : ℕ)
 
-  @[simp]
+  --@[simp]
   theorem add_assoc :
     (x + y) + z = x + (y + z)
   :=
@@ -103,7 +102,7 @@ section
     { change (x + y + z).succ = (x + (y + z)).succ,
       rw ih }
   end
-
+  
   @[simp]
   theorem zero_add :
     zero + x = x
@@ -126,7 +125,7 @@ section
       rw ih, refl }
   end
 
-  @[simp]
+  --@[simp]
   theorem add_comm :
     x + y = y + x
   :=
@@ -152,9 +151,10 @@ section
       rw [ih, add_assoc, ← add_assoc (y * z) x, add_comm (y * z) x],
       simp only [add_assoc] }
     -- TODO: "simp normal forms"
+    -- TODO: permute using `assoc` and `comm`? (requires: tactic programming)
   end
 
-  @[simp]
+  --@[simp]
   theorem mul_comm :
     x * y = y * x
   :=
@@ -218,6 +218,8 @@ section
 
 end
 
+--------------------------------------------------------------------------------
+
 section
   variables (x y z : ℕ)
 
@@ -278,9 +280,12 @@ section
 
 end
 
+--------------------------------------------------------------------------------
+
 section
   variables (x y z : ℕ)
 
+-- Alternative way to switch between ≤ and < (other than by definition)
   lemma le_iff_lt_or_eq :
     x ≤ y ↔ (x < y ∨ x = y)
   :=
@@ -295,7 +300,26 @@ section
       { use 0, exact eq.symm h₂ }}
   end
 
-  theorem le_total :
+  lemma add_right_le_of_le :
+    x ≤ y → x + z ≤ y + z
+  :=
+  begin
+    rintros ⟨c, hc⟩,
+    use c,
+    rw [hc, add_assoc, add_comm c z],
+    simp only [add_assoc]
+  end
+
+  lemma mul_right_le_of_le :
+    x ≤ y → x * z ≤ y * z
+  :=
+  begin
+    rintros ⟨c, hc⟩,
+    use c * z,
+    rw [hc, add_mul]
+  end
+
+  theorem le_total_order :
     is_total_order le
   :=
   begin
@@ -326,30 +350,11 @@ section
           { right, use c', rw hc, rw succ_add, refl }}}}
   end
 
-  lemma add_right_le_of_le :
-    x ≤ y → x + z ≤ y + z
-  :=
-  begin
-    rintros ⟨c, hc⟩,
-    use c,
-    rw [hc, add_assoc, add_comm c z],
-    simp only [add_assoc]
-  end
-
-  lemma mul_right_le_of_le :
-    x ≤ y → x * z ≤ y * z
-  :=
-  begin
-    rintros ⟨c, hc⟩,
-    use c * z,
-    rw [hc, add_mul]
-  end
-
   theorem lt_trichotomy :
     x = y ∨ x < y ∨ y < x
   :=
   begin
-    rcases le_total with ⟨_, _, _, htotal⟩,
+    rcases le_total_order with ⟨_, _, _, htotal⟩,
     rcases (htotal x y) with ⟨c, hc⟩ | ⟨c, hc⟩,
     { cases c with c',
       { left, exact eq.symm hc },
@@ -363,25 +368,128 @@ section
         { exact hc }}}
   end
 
+  lemma le_iff_not_gt :
+    x ≤ y ↔ ¬ (y < x)
+  :=
+  begin
+    split,
+    { rintros ⟨c, hc⟩ ⟨d, hd', hd⟩,
+      cases d with d, { exact hd' rfl },
+      rw [hc, add_assoc] at hd,
+      have hd₁ := zero_of_add_right_eq_self _ _ hd.symm,
+      injection hd₁ },
+    { intros h,
+      rcases lt_trichotomy x y with (h₁|h₂|h₃),
+      { use 0, rw h₁, refl },
+      { rcases h₂ with ⟨c, _, hc⟩, use c, exact hc },
+      { exfalso, exact h h₃ }}
+  end
+
+  lemma lt_iff_not_ge :
+    x < y ↔ ¬ (y ≤ x)
+  :=
+  begin
+    split,
+    { rintros ⟨c, hc', hc⟩ ⟨d, hd⟩,
+      cases c with c, { exact hc' rfl },
+      rw [hd, add_assoc] at hc,
+      have hc₁ := zero_of_add_right_eq_self _ _ hc.symm,
+      injection hc₁ },
+    { intros h,
+      rcases lt_trichotomy x y with (h₁|h₂|h₃),
+      { exfalso, exact h ⟨0, h₁⟩ },
+      { exact h₂ },
+      { rcases h₃ with ⟨c, _, hc⟩, exfalso, exact h ⟨c, hc⟩ }}
+  end
+
+-- TODO: `linarith`
+
+end
+
+--------------------------------------------------------------------------------
+
+section
+
+  theorem based_induction : ∀ (P : ℕ → Prop) (n₀ : ℕ),
+    P n₀ → (∀ m, n₀ ≤ m → P m → P (succ m)) → ∀ m, n₀ ≤ m → P m
+  :=
+    -- (Golfing, for tactic proof see the next theorem)
+    λ P n₀ h₀ h m ⟨c, hc⟩, hc.symm ▸ (mynat.rec_on c
+      h₀ (λ c' ih, h (n₀ + c') ⟨c', rfl⟩ ih))
+
+  theorem based_strong_induction : ∀ (P : ℕ → Prop) (n₀ : ℕ),
+    P n₀ → (∀ m, (∀ k, n₀ ≤ k → k ≤ m → P k) → P (succ m)) → ∀ m, n₀ ≤ m → P m
+  :=
+  begin
+    rintros P n₀ h₀ h m ⟨c, hc⟩,
+    have : ∀ x y, y ≤ x → P (n₀ + y),
+    { intros x, induction x with x ihx,
+      { rintros y ⟨d, hd⟩,
+        have hy := (zero_of_add_zero _ _ hd.symm).left,
+        rw hy,
+        exact h₀ },
+      { rintros y ⟨d, hd⟩,
+        cases d with d,
+        { change x.succ = y at hd,
+          rw ← hd,
+          apply h (n₀ + x),
+          rintros k ⟨e, he⟩ ⟨f, hf⟩,
+          rw he,
+          apply ihx e,
+          use f,
+          rw [he, add_assoc] at hf,
+          exact add_left_cancel _ _ _ hf },
+        { apply ihx,
+          use d,
+          exact mynat.succ.inj hd, }}},
+    rw hc,
+    exact this c c ⟨0, rfl⟩
+  end
+
+  theorem le_well_order : ∀ (X : set ℕ),
+    (∃ a₀, a₀ ∈ X) → ∃ a, (a ∈ X ∧ (∀ x, x ∈ X → a ≤ x))
+  :=
+  begin
+    rintros X ⟨a₀, ha₀⟩,
+    by_contra h,
+    have : ∀ n m, m ≤ n → m ∉ X,
+    { intros n, induction n with n ih,
+      -- Claim: 0 is not in X
+      { rintros m ⟨k, hk⟩ h₁,
+        have hm := (zero_of_add_zero _ _ hk.symm).left,
+        apply h, use 0, split,
+        { rw ← hm, exact h₁ },
+        intros x _, use x, exact (zero_add x).symm, },
+      -- IH   : 0 ~ n are not in X
+      -- Claim: 0 ~ (succ n) are not in X
+      { rintros m ⟨k, hk⟩ h₁,
+        cases k with k,
+        -- If (succ n) is in X, (succ n) will be the least element of X
+        { apply h,
+          use m, split, { exact h₁ },
+          intros x hx,
+          rw le_iff_not_gt,
+          rintros ⟨c, ⟨hc₁, hc₂⟩⟩,
+          cases c with c, { apply hc₁, refl },
+          apply (ih x),
+          { use c, apply mynat.succ.inj, rw hk, exact hc₂ },
+          { exact hx }},
+        -- If any of 0 ~ n is in X, that directly contradicts with IH
+        { refine ih m _ h₁,
+          use k,
+          apply mynat.succ.inj,
+          exact hk }}},
+    refine this a₀ a₀ _ ha₀,
+    use 0, refl
+  end
+
+-- TODO: well-ordering principle for decidable predicates
+-- TODO: (requires well-founded recursion...?)
+
 end
 
 end mynat
 
-
---------------------------------------------------------------------------------
--- # Integers
-
-
-
-
-
-
 --------------------------------------------------------------------------------
 
 end notes
-
-
-
-
-
-

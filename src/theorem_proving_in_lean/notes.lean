@@ -1295,9 +1295,17 @@ namespace option
 end option
 -/
 
+-- Another option is to combine PA3 and PA4 together, in one dependently-typed function!
+-- By cases on constructors of `a` and `b`:
+--   If both of them are `zero`s (resp. `none`), return a `true` (useless return value)
+--   If one of them is `zero` and one of them is `succ _` (resp. `none` and `some _`),
+--     return a proof of `a ≠ b` (PA3)
+--   If one is `succ a'` and the other is `succ b'` (resp. `some a'` and `some b'`), extract `a'` and `b'`
+--     and return a proof of `a = b → a' = b'` (PA4)
+
 /-
 For the naturals, PA3 and PA4 ensure that every time you apply `succ` on an existing natural,
-you are guaranteed to make a "new" natural, different from everything below. Two naturals `m` and `n` are equal iff:
+you are guaranteed to make a "new" natural, different from everything you already have. Two naturals `m` and `n` are equal iff:
 
 * They are both `zero` or both made from `succ`;
 * If `m` is made from `succ m'` and `n` from `succ n'`, then `m'` and `n'` are equal.
@@ -1319,8 +1327,8 @@ And the "no_confusion" lemma should:
 * Provide a proof of `P` if `a` and `b` are not constructed from the same constructor;
 * Provide a proof of `(a1 = b1 → ... → ak = bk → P) → P` if `a` and `b` are constructed from the same constructor with k parameters.
 
-The above two formulations are equivalent. The second one is almost exactly what `no_confusion_type` declares!
-(It allows `P` to be in any `Sort`, though...)
+The above two formulations are equivalent. Both can be defined by cases on `a` and `b`.
+The second one is almost exactly what `no_confusion_type` declares! (It allows `P` to be in any `Sort`, though...)
 -/
 
 section
@@ -1342,8 +1350,8 @@ namespace mynat
       λ P n m h, @eq.rec_on mynat n              -- Eliminating `eq` first makes the proof shorter
         (λ r, mynat.no_confusion_type P n r) m h -- Target type and specialisation
         (mynat.cases_on n                        -- The `refl` case
-          (λ hp, hp)                             -- * The `zero` case: target type is P → P
-          (λ n' hp, hp rfl))                     -- * The `succ` case: target type is (n' = n' → P) → P
+          (λ hp, hp)                             -- * The `zero` case: target type is `P → P`
+          (λ n' hp, hp rfl))                     -- * The `succ` case: target type is `(n' = n' → P) → P`
 end mynat
 
 namespace tree
@@ -1353,8 +1361,8 @@ namespace tree
       λ α P a b h, @eq.rec_on (tree α) a         -- Eliminating `eq` first makes the proof shorter
         (λ r, tree.no_confusion_type P a r) b h  -- Target type and specialisation
         (tree.cases_on a                         -- The `refl` case
-          (λ x hp, hp rfl)                       -- * The `leaf` case: target type is (x = x → P) → P
-          (λ l x r hp, hp rfl rfl rfl))          -- * The `node` case: target type is (l = l → x = x → r = r → P) → P
+          (λ x hp, hp rfl)                       -- * The `leaf` case: target type is `(x = x → P) → P`
+          (λ l x r hp, hp rfl rfl rfl))          -- * The `node` case: target type is `(l = l → x = x → r = r → P) → P`
 end tree
 
 -- TODO: using `no_confusion` and `inj` ("wrapper")
@@ -1572,3 +1580,20 @@ section
 end
 
 end subtypes
+
+--------------------------------------------------------------------------------
+-- Axioms
+
+#check @propext
+/-
+∀ {a b : Prop}, (a ↔ b) → a = b
+-/
+#check @funext 
+/-
+∀ {α : Sort u} {β : α → Sort v} {f₁ f₂ : Π (x : α), β x},
+  (∀ (x : α), f₁ x = f₂ x) → f₁ = f₂
+-/
+-- Note: `funext` is derived from quotient?
+-- Note: "extensional" vs "intensional" view of functions
+
+
