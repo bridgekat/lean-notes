@@ -92,7 +92,7 @@ namespace mynat
 section
   variables (x y z : ℕ)
 
-  --@[simp]
+  @[simp]
   theorem add_assoc :
     (x + y) + z = x + (y + z)
   :=

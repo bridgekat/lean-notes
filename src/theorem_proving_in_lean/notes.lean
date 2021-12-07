@@ -1616,6 +1616,7 @@ section quotient
 -- (i.e. `quot r` contains only those elements constructed from `quot.mk r`)
 -- TODO: why this only eliminates into a type in `Prop`...
 
+-- The above three rules are also present in an inductive type like this:
 inductive myquot {α : Type} (r : α → α → Prop) : Type
 | mk [] : α → myquot
 
@@ -1625,14 +1626,14 @@ inductive myquot {α : Type} (r : α → α → Prop) : Type
 
 -- Examples:
 
-def myint.eq_relation : ℕ × ℕ → ℕ × ℕ → Prop :=
+def myint.eqv : ℕ × ℕ → ℕ × ℕ → Prop :=
   λ ⟨a, b⟩ ⟨c, d⟩, a + d = c + b
 
 def myint : Type :=
-  quot myint.eq_relation
+  quot myint.eqv
 
 def myint.mk : ℕ × ℕ → myint :=
-  quot.mk myint.eq_relation
+  quot.mk myint.eqv
 
 def myint.ind : Π {motive : myint → Prop},
   (∀ (x : ℕ × ℕ), motive (myint.mk x)) → ∀ (x : myint), motive x :=
@@ -1662,24 +1663,25 @@ def myint.ind : Π {motive : myint → Prop},
 -- Examples:
 
 namespace myint
+section
 
-def sound : Π {a b : ℕ × ℕ}, eq_relation a b → myint.mk a = myint.mk b :=
-  @quot.sound _ eq_relation
+def sound : Π {a b : ℕ × ℕ}, eqv a b → myint.mk a = myint.mk b :=
+  @quot.sound _ eqv
 
-def lift : Π {β : Sort u} (f : ℕ × ℕ → β), (∀ a b, eq_relation a b → f a = f b) → myint → β :=
-  @quot.lift _ eq_relation
+def lift : Π {β : Sort u} (f : ℕ × ℕ → β), (∀ a b, eqv a b → f a = f b) → myint → β :=
+  @quot.lift _ eqv
 
 -- Original definition for negation
-private def neg_def : ℕ × ℕ → myint :=
+def neg_def : ℕ × ℕ → myint :=
   λ ⟨a, b⟩, myint.mk (b, a)
 
 -- Check if well-defined
-private theorem neg_well_defined :
-  ∀ (x y : ℕ × ℕ), eq_relation x y → neg_def x = neg_def y :=
+lemma neg_well_defined :
+  ∀ (x y : ℕ × ℕ), eqv x y → neg_def x = neg_def y :=
   λ ⟨a, b⟩ ⟨c, d⟩ h, by {
     unfold neg_def at *,
     apply sound,
-    unfold eq_relation at *,
+    unfold eqv at *,
     rw [nat.add_comm b c, nat.add_comm d a],
     exact h.symm,
   }
@@ -1700,7 +1702,55 @@ example : (quot.lift neg_def neg_well_defined) (myint.mk (1, 3)) = neg_def (1, 3
 -- See: https://leanprover.zulipchat.com/#narrow/stream/113488-general/topic/Kevin's.20talk.20at.20MSR/near/177835824
 -- See: https://leanprover.zulipchat.com/#narrow/stream/113488-general/topic/Kevin's.20talk.20at.20MSR/near/177836064
 
+
+lemma eqv_refl : ∀ x, eqv x x :=
+  λ ⟨a, b⟩, rfl
+
+-- Another definition: addition
+def add_fn : ℕ × ℕ → ℕ × ℕ → myint :=
+  λ ⟨a, b⟩ ⟨c, d⟩, quot.mk eqv (a + c, b + d)
+
+-- Assume that it is well-defined (i.e. respects `eqv` on both arguments)
+parameter add_respects_fst : ∀ x x' y, eqv x x' → add_fn x y = add_fn x' y
+parameter add_respects_snd : ∀ x y y', eqv y y' → add_fn x y = add_fn x y'
+
+-- Lift second argument
+def add_fn' : ℕ × ℕ → myint → myint :=
+  λ x, quot.lift (add_fn x) (add_respects_snd x)
+
+-- Lift first argument
+lemma add_respects'' : ∀ x x' : ℕ × ℕ, eqv x x' → add_fn' x = add_fn' x' :=
+  λ x x' h, funext (λ y, quot.ind (λ y, (add_respects_fst x x' y h)) y)
+
+-- Lifted function
+def add : myint → myint → myint :=
+  quot.lift add_fn' add_respects''
+
+-- In fact, this "double-lift" is already implemented in mathlib (in exactly the same way as above)!
+-- (Add `import data.quot` in the beginning of the file)
+/-
+def add' : myint → myint → myint :=
+  quot.lift₂ add_fn add_respects_snd add_respects_fst
+-/
+
+-- -4 + 1 = -3
+#reduce add (myint.mk (1, 5)) (myint.mk (2, 1))
+
+end
 end myint
+
+-- There is also a `map₂` in mathlib, which is a cooler way to make `Q → Q → Q` from `X → X → X`!
+-- Let's try to implement it.
+def map₂ {α : Type u} {r : α → α → Prop}
+  (f : α → α → α)
+  (h₂ : ∀ x y y', r y y' → r (f x y) (f x y'))
+  (h₁ : ∀ x x' y, r x x' → r (f x y) (f x' y)) :
+  quot r → quot r → quot r :=
+    quot.lift
+      (λ x, quot.lift (λ y, quot.mk r (f x y)) (λ y y' h, quot.sound (h₂ x y y' h)))
+      (λ x x' h, funext (λ y, quot.ind (λ y, quot.sound (h₁ x x' y h)) y))
+-- (It is better to note down all arguments of `quot.ind`, `quot.sound`, `quot.lift` and the computation rule
+--  while doing this kind of plumbing... Also note down the current goal if necessary!)
 
 
 end quotient
