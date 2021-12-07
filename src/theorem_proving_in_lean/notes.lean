@@ -799,47 +799,46 @@ Special case: if the inductive type lives in `Prop`, the `λ(x : <type-name...>)
 will vanish, and the motive could only return a `Prop`!
 -/
 
+-- TODO: how are the allowed universe levels determined for `inductive`...?
+-- See: https://leanprover.github.io/theorem_proving_in_lean/inductive_types.html#axiomatic-details
+
 
 --------------------------------------------------------------------------------
 -- **Examples of inductive types**
 
--- TODO: logical connectives, quantifiers, natural numbers...
--- Go back and check the intelim rules for Σ, ×, +, 0, 1!
-
-namespace hidden
-
-inductive empty : Type
-
-inductive unit : Type
-| star : unit
-
-inductive bool : Type
-| ff : bool
-| tt : bool
-
-def ex_falso (α : Type) : empty → α := empty.rec (λx, α)
-
+namespace hidden -- (Avoid naming clashes)
 universes v
-
--- Type constructors
-inductive prod (α : Type u) (β : Type v) : Type max u v
-| mk : α → β → prod
-
 variables α β : Type
 variables (a : α) (b : β)
 
+-- Check the intelim rules for Σ, ×, +, 0, 1!
+-- The empty type 0
+inductive empty : Type
+
+def exfalso (α : Type) : empty → α := empty.rec (λx, α)
+
+-- The unit type 1
+inductive unit : Type
+| star : unit
+
+-- The × type constructor
+-- `max` or `imax` may be used in specifying universe levels
+inductive prod (α : Type u) (β : Type v) : Type max u v
+| mk : α → β → prod
+
 #check prod
-#check @prod.mk
 #check prod α β
+#check @prod.mk
 #check prod.mk a b
-#check @prod.rec.{1}
+#check @prod.rec.{1} -- `.{...}` is used to instantiate universe levels
 
 def fst {α : Type u} {β : Type v} (p : prod α β) : α :=
-  prod.rec_on p (λ a b, a)
+  prod.rec_on p (λ a _, a)
 
 def snd {α : Type u} {β : Type v} (p : prod α β) : β :=
-  prod.rec_on p (λ a b, b)
+  prod.rec_on p (λ _ b, b)
 
+-- The + type constructor
 inductive sum (α : Type u) (β : Type v) : Type max u v
 | inl : α → sum
 | inr : β → sum
@@ -848,66 +847,143 @@ inductive sum (α : Type u) (β : Type v) : Type max u v
 #check @sum.inr
 #check @sum.rec.{1}
 
-
+-- The Σ type constructor
 inductive sigma {α : Type u} (β : α → Type v) : Type max u v
-| dpair : Π a : α, β a → sigma
+| mk : Π a : α, β a → sigma
 
+-- The natural numbers
+inductive nat : Type
+| zero :       nat
+| succ : nat → nat
+
+namespace nat
+  #check zero
+  #check succ (succ (succ zero))
+  #check zero.succ.succ.succ
+end nat
+
+-- Boolean
+inductive bool : Type
+| ff : bool
+| tt : bool
+
+-- "Maybe"
 inductive option (α : Type u) : Type u
-| none {} : option
+| none {} :     option -- `{}` forces `α` to be implicit; `[]` forces `α` to be explicit (in constructors)
 | some    : α → option
 
+-- "Witness"
 inductive inhabited (α : Type u) : Type u
 | mk : α → inhabited
 
+-- "Subtype"
+inductive subtype {α : Sort u} (p : α → Prop) : Sort max u 1
+| mk : Π (x : α), Π (h : p x), subtype
 
--- TODO: how are the allowed universe levels determined for `inductive`...?
--- See: https://leanprover.github.io/theorem_proving_in_lean/inductive_types.html#axiomatic-details
-inductive mysubtype {α : Sort u} (p : α → Prop) : Sort u
-| mk : Π (x : α), Π (h : p x), mysubtype
-
-#check @sigma   -- `Π {α : Type u_1}, (α → Type u_2) → Type (max u_1 u_2)`
-#check @subtype -- `Π {α : Sort u_1}, (α → Prop) → Sort (max 1 u_1)`
-#check @Exists  -- `Π {α : Sort u_1}, (α → Prop) → Prop`
+-- The following three are similar in structure:
+#check @sigma   -- `Π {α : Type u}, (α → Type v) → Type (max u v)`
+#check @subtype -- `Π {α : Sort u}, (α → Prop) → Sort (max u 1)`
+#check @Exists  -- `Π {α : Sort u}, (α → Prop) → Prop`
 -- "Subtype is inhabited -- the element satisfying the predicate is found -- the existential statement has a proof"
 
 end hidden
 
-namespace structures
+
+inductive color : Type
+| red   : color
+| green : color
+| blue  : color
+
 -- `structure`s are special cases of inductive types!
--- They have only one constructor.
-
-structure point (α : Type*) :=
+-- They have only one constructor (by default it is called `mk`).
+structure point (α : Type) : Type :=
   mk :: (x : α) (y : α) (z : α)
+/-
+Same as:
+`inductive point (α : Type) : Type`
+`| mk : α → α → α → point`
+with
+`def point.x : Π {α : Type}, point α → α :=`
+`  λ α p, @point.rec_on _ (λ _, α) p (λ x _ _, x)`
+and so on...
+-/
 
-inductive color
-| red
-| green
-| blue
-
-structure color_point (α : Type*) extends point α :=
+-- `extends`: copy the definitions of all data fields from ...
+structure color_point (α : Type) extends point α :=
   mk :: (c : color)
 
-structure rgb_val :=
-  (red : nat)
-  (green : nat)
-  (blue : nat)
+-- `mk ::` can be omitted
+structure rgb_val : Type :=
+  (red : nat) (green : nat) (blue : nat)
 
-structure red_green_point (α : Type*) extends point α, rgb_val :=
+-- Same as above; we can use multiple `extends`...
+structure red_green_point (α : Type) extends point α, rgb_val :=
   (no_blue : blue = 0)
 
-def p   : point nat := { x := 10, y := 10, z := 20 }
-def rgp : red_green_point nat :=
-  { red := 200, green := 40, blue := 0, no_blue := rfl, ..p }
+-- Plain way to write a constructor
+def p   : point nat := point.mk 10 10 20
+-- Using the "anonymous constructor" notation for inductive types
+def p'  : point nat := ⟨10, 10, 20⟩
+-- Special way to write a constructor (`structure` only)
+def p'' : point nat := { x := 10, y := 10, z := 20 }
+-- Copy all data from `p` using `..p` (extended `structure` only)
+def rgp : red_green_point nat := { red := 200, green := 40, blue := 0, no_blue := rfl, ..p }
 
+-- Automatically generated data field accessor / projector
 example : rgp.x   = 10  := rfl
 example : rgp.red = 200 := rfl
 
 
-
-end structures
 end inductive_types
+section definitional_equality
+
+--------------------------------------------------------------------------------
+-- **Computation rules** and **definitional equality**
+-- See: https://leanprover.github.io/reference/expressions.html#computation
+
+/-
+We have seen that `#reduce` could:
+* Expand functions defined by `λ` expressions ("β-reduction")
+* Expand `let`s                               ("ζ-reduction" - term invented by Lean's creators)
+* Expand `def`s                               ("δ-reduction" - term invented by Lean's creators)
+* Expand functions defined by recursors       ("ι-reduction" - term invented by Lean's creators)
+
+These rules produce expressions that are often simpler than, but "equal" to the original expression in some sense.
+  We call this kind of equality "definitional equality" (or "judgmental equality").
+These rules also allows for some form of "computation" (primitive recursive? Weaker than Turing-complete).
+-/
+
+parameters (α β : Type)
+parameters (a : α) (b : β)
+
+-- α-equivalent expressions have the same internal syntactical representation in Lean, thus are def eq:
+#check (eq.refl _ : (λ x : α, x) = (λ y : α, y))
+
+-- TODO: `let` vs `λ`
+def foo := (let a := nat in λ x : a, x + 2) -- Typechecks
+-- def bar := (λ α, λ x : α, x + 2) nat -- Does not typecheck
 
 
+-- Apart from the four reduction rules, there are two more rules for def eq (these two are not used in `#reduce`):
+-- "η-equivalence":
+#check (eq.refl _ : (λ y : α, (λ x : α, x) y) = (λ x : α, x))
+-- "Proof-irrelevance" (TODO: complete)
+
+
+-- When checking types, def eq expressions are regarded as the same!
+#check (b : β)
+#check (b : (λ x : α, β) a)
+
+
+-- TODO: how could `#eval` calculate this so quickly?
+#eval 12345 * 54321
+
+-- TODO: check screenshots & bookmarks
+
+-- TODO: review (check computation rules)
+
+
+end definitional_equality
 section inductive_families
 
 --------------------------------------------------------------------------------
@@ -1190,7 +1266,7 @@ end
 -- In general, the "inductive-elimination" rule is used by the `rec` method:
 /-
 `@<family-name>.rec [parameters...]`
-`  (λ[indices], λ(x : <family-name...> [indices]), <type-for-the-new-term-constructed-from-x>)` -- (the "motive" or "typing function")
+`  (λ[indices], λ x, <type-for-the-new-term-constructed-from-x>)` -- (the "motive" or "typing function")
 `  (λ(...), ..., λ(...), <new-term-for-constructor-1>)`
 `  (λ(...), ..., λ(...), <new-term-for-constructor-2>)`
 `  ...`
@@ -1255,7 +1331,7 @@ namespace mynat
 
   theorem succ_inj : Π (n m : mynat), succ n = succ m → n = m :=
     λ n m h, @eq.subst _ (λ x, pred (succ n) = pred x) _ _ h (eq.refl (pred (succ n)))
-  -- We just prove `pred (succ n) = pred (succ m)`, which is defeq to `n = m`
+  -- We just prove `pred (succ n) = pred (succ m)`, which is def eq to `n = m`
 
   -- This above strategy sometimes does not work; consider `option`...
   -- When trying to define the "extractor" function for `some`, we found it impossible to
@@ -1283,7 +1359,7 @@ namespace option
 
   #reduce extract_type (some 1)
   #reduce extract_type (some 2)
-  -- #check extract (some 1) = extract (some 2) -- Oops, does not typecheck (TODO: because defeq is not transitive?)
+  -- #check extract (some 1) = extract (some 2) -- Oops, does not typecheck (TODO: because def eq is not transitive?)
   #check @eq ℕ (extract (some 1)) (extract (some 2))
 
   -- theorem some_inj : Π {α : Type} (a b : α), some a = some b → a = b :=
@@ -1371,43 +1447,6 @@ end tree
 end inductive_families
 
 --------------------------------------------------------------------------------
-
--- TODO: equality and computation rules
-
-section judgmental_equality
-
-/-
-In type theory, we would like to ensure that every expression **has a unique type**.
-However, it turns out that according to the rules above, an expression could have more than
-one expressions assigned as its type, e.g.:
-
-[WRONG; DELETE]
--/
-
-parameter α : Type 1
-parameter β : α → Type 1
-parameter a : α
-
-#check (sorry : α)
-
-end judgmental_equality
-
-
---------------------------------------------------------------------------------
-
--- How could `#eval` calculate this so quickly?
-#eval 12345 * 54321
-
--- TODO: `let` vs `λ`:
-def foo := (let a := nat in λ x : a, x + 2)
--- def bar := (λ α, λ x : α, x + 2) nat -- Does not typecheck
-
--- TODO: check screenshots & bookmarks
-
--- TODO: review
-
-
---------------------------------------------------------------------------------
 -- **The `Prop` universe**
 
 /-
@@ -1485,8 +1524,196 @@ Let's try some additional functionalities provided by Lean's elaborator...
 
 end equation_compiler
 
+
+--------------------------------------------------------------------------------
+-- Typeclasses
+
+namespace hidden_typeclasses
+
+class inhabited (α : Type _) :=
+  mk :: (default : α)
+
+instance Prop_inhabited : inhabited Prop :=
+  inhabited.mk true
+
+instance bool_inhabited : inhabited bool :=
+  inhabited.mk tt
+
+instance nat_inhabited : inhabited nat :=
+  inhabited.mk 0
+
+instance unit_inhabited : inhabited unit :=
+  inhabited.mk ()
+
+def default (α : Type*) [s : inhabited α] : α :=
+  @inhabited.default α s
+
+#reduce default Prop
+#reduce default bool
+#reduce default nat
+#reduce default unit
+
+
+
+end hidden_typeclasses
+
 --------------------------------------------------------------------------------
 
+namespace hidden_subtypes
+
+inductive my_subtype {α : Type u} (p : α → Prop) : Type u
+| mk : Π x : α, p x → my_subtype
+
+section
+  variables {α : Type u} (p : α → Prop)
+  
+  #check @my_subtype
+  #check (α → Prop) → Type u
+  #check Π {α : Type u}, (α → Prop) → Type u
+
+  #check @my_subtype α p
+  #check {x : α // p x}
+end
+
+end hidden_subtypes
+
+--------------------------------------------------------------------------------
+-- **Extensionality axioms**
+
+#check @propext
+-- "Proposition extensionality":
+-- `∀ {a b : Prop}, (a ↔ b) → a = b`
+
+#check @funext 
+-- "Function extensionality":
+-- `∀ {α : Sort u} {β : α → Sort v} {f₁ f₂ : Π (x : α), β x},`
+--   `(∀ (x : α), f₁ x = f₂ x) → f₁ = f₂`
+
+-- Note: `funext` is derived from quotient?
+-- Note: "extensional" (funext) vs "intensional" (def eq) view of functions
+
+
+section quotient
+
+--------------------------------------------------------------------------------
+-- **quot-formation**, **quot-introduction** and **quot-elimination**
+
+-- These following are constants (axioms), but they will not be visible in `#print axioms`:
+
+#check @quot
+-- `Π {α : Sort u}, (α → α → Prop) → Sort u`
+-- "quot-formation": takes a (equivalence?) relation, returns a new type
+
+#check @quot.mk
+-- `Π {α : Sort u} (r : α → α → Prop), α → quot r`
+-- "quot-introduction": takes a (equivalence?) relation and an element, returns an element (equivalence class)
+
+#check @quot.ind
+-- `∀ {α : Sort u} {r : α → α → Prop} {β : quot r → Prop},`
+--   `(∀ a, β (quot.mk r a)) → ∀ (q : quot r), β q`
+-- "quot-elimination":
+-- If every element's equivalence class satisfies a given predicate, then everything in `quot r` also satisfy that predicate.
+-- (i.e. `quot r` contains only those elements constructed from `quot.mk r`)
+-- TODO: why this only eliminates into a type in `Prop`...
+
+inductive myquot {α : Type} (r : α → α → Prop) : Type
+| mk [] : α → myquot
+
+#check @myquot
+#check @myquot.mk
+#check @myquot.rec
+
+-- Examples:
+
+def myint.eq_relation : ℕ × ℕ → ℕ × ℕ → Prop :=
+  λ ⟨a, b⟩ ⟨c, d⟩, a + d = c + b
+
+def myint : Type :=
+  quot myint.eq_relation
+
+def myint.mk : ℕ × ℕ → myint :=
+  quot.mk myint.eq_relation
+
+def myint.ind : Π {motive : myint → Prop},
+  (∀ (x : ℕ × ℕ), motive (myint.mk x)) → ∀ (x : myint), motive x :=
+  λ _ h, quot.ind h
+
+#check myint
+#check myint.mk (5, 3)
+
+
+--------------------------------------------------------------------------------
+-- **quot-sound** and **quot-computation**
+
+-- Only this axiom will be visible in `#print axioms` (why?):
+#check @quot.sound
+-- `∀ {α : Sort u} {r : α → α → Prop} {a b : α},`
+--    `r a b → quot.mk r a = quot.mk r b`
+-- Given `r a b`, returns a proof that the elements `quot.mk r a` and `quot.mk r b` are equal
+-- (i.e. `quot.mk r` indeed makes equivalence classes;
+--  `r` is not necessarily an equivalence relation, we consider the equivalence relation it "generates")
+
+#check @quot.lift
+-- `Π {α : Sort u} {r : α → α → Prop} {β : Sort u} (f : α → β),`
+--   `(∀ a b, r a b → f a = f b) → quot r → β`
+-- Given a function and a proof that it is "well-defined on the quotient `quot r`" ("respects the relation `r`"),
+--   returns a new function defined on the quotient.
+
+-- Examples:
+
+namespace myint
+
+def sound : Π {a b : ℕ × ℕ}, eq_relation a b → myint.mk a = myint.mk b :=
+  @quot.sound _ eq_relation
+
+def lift : Π {β : Sort u} (f : ℕ × ℕ → β), (∀ a b, eq_relation a b → f a = f b) → myint → β :=
+  @quot.lift _ eq_relation
+
+-- Original definition for negation
+private def neg_def : ℕ × ℕ → myint :=
+  λ ⟨a, b⟩, myint.mk (b, a)
+
+-- Check if well-defined
+private theorem neg_well_defined :
+  ∀ (x y : ℕ × ℕ), eq_relation x y → neg_def x = neg_def y :=
+  λ ⟨a, b⟩ ⟨c, d⟩ h, by {
+    unfold neg_def at *,
+    apply sound,
+    unfold eq_relation at *,
+    rw [nat.add_comm b c, nat.add_comm d a],
+    exact h.symm,
+  }
+
+-- Lifted function
+def neg : myint → myint :=
+  myint.lift neg_def neg_well_defined
+
+#check neg (myint.mk (1, 3))
+#reduce neg (myint.mk (1, 3)) -- "quot-computation" rule
+
+example : (quot.lift neg_def neg_well_defined) (myint.mk (1, 3)) = neg_def (1, 3) :=
+  eq.refl _
+-- "quot-computation": mk and then use lifted function = use original function
+
+-- Relevant discussions: https://github.com/coq/coq/issues/10871
+-- (TODO: how could this break "subject reduction"???)
+-- See: https://leanprover.zulipchat.com/#narrow/stream/113488-general/topic/Kevin's.20talk.20at.20MSR/near/177835824
+-- See: https://leanprover.zulipchat.com/#narrow/stream/113488-general/topic/Kevin's.20talk.20at.20MSR/near/177836064
+
+end myint
+
+
+end quotient
+section axiom_of_choice
+
+--------------------------------------------------------------------------------
+-- **Axiom of choice** and **law of exluded middle**
+
+
+
+end axiom_of_choice
+
+--------------------------------------------------------------------------------
 /-
 ### Interacting with Lean
 
@@ -1527,73 +1754,3 @@ variables i j : ℤ
 #check @prod.fst
 #check @prod.snd
 #check @prod.rec
-
-
---------------------------------------------------------------------------------
--- Typeclasses
-
-namespace hidden_typeclasses
-
-class inhabited (α : Type _) :=
-  mk :: (default : α)
-
-instance Prop_inhabited : inhabited Prop :=
-  inhabited.mk true
-
-instance bool_inhabited : inhabited bool :=
-  inhabited.mk tt
-
-instance nat_inhabited : inhabited nat :=
-  inhabited.mk 0
-
-instance unit_inhabited : inhabited unit :=
-  inhabited.mk ()
-
-def default (α : Type*) [s : inhabited α] : α :=
-  @inhabited.default α s
-
-#reduce default Prop
-#reduce default bool
-#reduce default nat
-#reduce default unit
-
-
-
-end hidden_typeclasses
-
---------------------------------------------------------------------------------
-
-namespace subtypes
-
-inductive my_subtype {α : Type u} (p : α → Prop) : Type u
-| mk : Π x : α, p x → my_subtype
-
-section
-  variables {α : Type u} (p : α → Prop)
-  
-  #check @my_subtype
-  #check (α → Prop) → Type u
-  #check Π {α : Type u}, (α → Prop) → Type u
-
-  #check my_subtype p
-  #check {x : α // p x}
-end
-
-end subtypes
-
---------------------------------------------------------------------------------
--- Axioms
-
-#check @propext
-/-
-∀ {a b : Prop}, (a ↔ b) → a = b
--/
-#check @funext 
-/-
-∀ {α : Sort u} {β : α → Sort v} {f₁ f₂ : Π (x : α), β x},
-  (∀ (x : α), f₁ x = f₂ x) → f₁ = f₂
--/
--- Note: `funext` is derived from quotient?
--- Note: "extensional" vs "intensional" view of functions
-
-
