@@ -128,8 +128,9 @@ section
     quot.map₂ mul_fn mul_respects_snd mul_respects_fst
   instance : has_mul ℚ := ⟨mul⟩
 
--- Inversion (TODO: complete)
-  def inv_fn : ℤ × ℤ* → ℤ × ℤ* := sorry
+-- Inversion
+  def inv_fn : Π (x : ℤ × ℤ*), (x.fst ≠ 0) → ℤ × ℤ* :=
+    λ ⟨a, b, hb⟩ ha, (b, ⟨a, ha⟩)
 
   lemma inv_respects :
     ∀ (x₁ x₂ : ℤ × ℤ*), (x₁ ∼ x₂) → (inv_fn x₁ ∼ inv_fn x₂)

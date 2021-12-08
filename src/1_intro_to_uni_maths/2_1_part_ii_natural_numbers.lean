@@ -230,8 +230,8 @@ section
     induction z with z ih,
     { exact id },
     { intros h,
-      have h' := succ.inj h,
-      exact ih h' }
+      replace h := succ.inj h,
+      exact ih h }
   end
 
   lemma add_left_cancel : z + x = z + y → x = y :=
@@ -271,8 +271,8 @@ section
         change (x * z'.succ + z').succ = zero at h,
         injections },
       { rw succ_mul at h,
-        have h' := add_right_cancel _ _ _ h,
-        rw (ih y' h') }}
+        replace h := add_right_cancel _ _ _ h,
+        rw (ih y' h) }}
   end
 
   lemma mul_left_cancel : z ≠ zero → z * x = z * y → x = y :=
@@ -331,8 +331,8 @@ section
     { rintros x y ⟨c, hc⟩ ⟨d, hd⟩,
       rw [hc, add_assoc] at hd,
       change x + zero = x + (c + d) at hd,
-      have hd' := eq.symm (add_left_cancel _ _ _ hd),
-      cases (zero_of_add_zero _ _ hd') with hc₁ hd₁,
+      replace hd := eq.symm (add_left_cancel _ _ _ hd),
+      cases (zero_of_add_zero _ _ hd) with hc₁ hd₁,
       rw hc₁ at hc,
       exact eq.symm hc },
     -- Trans
@@ -376,8 +376,8 @@ section
     { rintros ⟨c, hc⟩ ⟨d, hd', hd⟩,
       cases d with d, { exact hd' rfl },
       rw [hc, add_assoc] at hd,
-      have hd₁ := zero_of_add_right_eq_self _ _ hd.symm,
-      injection hd₁ },
+      replace hd := zero_of_add_right_eq_self _ _ hd.symm,
+      injection hd },
     { intros h,
       rcases lt_trichotomy x y with (h₁|h₂|h₃),
       { use 0, rw h₁, refl },
@@ -393,8 +393,8 @@ section
     { rintros ⟨c, hc', hc⟩ ⟨d, hd⟩,
       cases c with c, { exact hc' rfl },
       rw [hd, add_assoc] at hc,
-      have hc₁ := zero_of_add_right_eq_self _ _ hc.symm,
-      injection hc₁ },
+      replace hc := zero_of_add_right_eq_self _ _ hc.symm,
+      injection hc },
     { intros h,
       rcases lt_trichotomy x y with (h₁|h₂|h₃),
       { exfalso, exact h ⟨0, h₁⟩ },

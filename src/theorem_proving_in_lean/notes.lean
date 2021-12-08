@@ -8,9 +8,10 @@
 Here we proceed to the "advanced level":
 
 * Theorem Proving in Lean: https://leanprover.github.io/theorem_proving_in_lean/
+* Programming in Lean: https://leanprover.github.io/programming_in_lean/programming_in_lean.pdf
+* Lean Forward: https://lean-forward.github.io/logical-verification/2018/
 * Mario Carneiro's thesis: https://github.com/digama0/lean-type-theory/releases/
 * The HoTT Book: https://homotopytypetheory.org/book/
-* Programming in Lean: https://leanprover.github.io/programming_in_lean/programming_in_lean.pdf
 * Lean Zulip chat: https://leanprover.zulipchat.com/
 -/
 
@@ -412,7 +413,7 @@ end coproduct_type_and_0_and_1
 
 --------------------------------------------------------------------------------
 /-
-Summary: only Π (and →) is a primitive notion in Lean. Σ, ×, +, 0, 1, ¬ are not.
+Summary: only Π (along with its synonyms ∀, →) is a primitive notion in Lean. Σ, ×, +, 0, 1, ¬ are not.
 （以下假设cumulative... 若依赖的两个type所在的universe level不等，Lean会在两者之间取最大值作为形成的type所在的level）
 
 -- **Summary of formation rules:**
@@ -650,7 +651,7 @@ section
 end
 
 -- See: https://leanprover.github.io/reference/declarations.html#inductive-types
--- In general, the "inductive-formation" rule is used by the `inductive` keyword:
+-- In general, we can extend the theory (global context) using the `inductive` keyword:
 /-
 `inductive <type-name> [parameters i.e. additional hypotheses...] : Sort <level>`
 `| <constructor-name-1> : Π(...), ..., Π(...), <type-name>`
@@ -674,7 +675,7 @@ So if "*in all cases*, we could build another term (from the things 'went into' 
 build that term. This is called the "inductive-elimination" rule.
 -/
 
--- **Inductive-elimination**
+-- **Inductive-elimination** and **inductive-computation**
 
 -- This special "method" `rec` is generated for each inductive type:
 #check weekday.rec
@@ -695,6 +696,7 @@ def number_of_day :=
   @weekday.rec (λ x, ℕ) 1 2 3 4 5 6 7
 
 #check number_of_day
+-- The "inductive-computation" rule: `rec` definitions can be expanded!
 #reduce number_of_day weekday.sunday
 #reduce number_of_day weekday.monday
 #reduce number_of_day weekday.tuesday
@@ -880,6 +882,11 @@ inductive inhabited (α : Type u) : Type u
 inductive subtype {α : Sort u} (p : α → Prop) : Sort max u 1
 | mk : Π (x : α), Π (h : p x), subtype
 
+variable (p : α → Prop)
+#check subtype p
+#check {x : α // p x}
+-- `{x : α // p x}` is syntactic sugar for `subtype (λx : α, p x)` (or just `subtype p`!)
+
 -- The following three are similar in structure:
 #check @sigma   -- `Π {α : Type u}, (α → Type v) → Type (max u v)`
 #check @subtype -- `Π {α : Sort u}, (α → Prop) → Sort (max u 1)`
@@ -895,7 +902,7 @@ inductive color : Type
 | blue  : color
 
 -- `structure`s are special cases of inductive types!
--- They have only one constructor (by default it is called `mk`).
+-- They have only one constructor (by default it is called `mk`), and it is not recursive.
 structure point (α : Type) : Type :=
   mk :: (x : α) (y : α) (z : α)
 /-
@@ -924,17 +931,84 @@ structure red_green_point (α : Type) extends point α, rgb_val :=
 def p   : point nat := point.mk 10 10 20
 -- Using the "anonymous constructor" notation for inductive types
 def p'  : point nat := ⟨10, 10, 20⟩
--- Special way to write a constructor (`structure` only)
+-- Special way to write a constructor (`structure` only, the first specified value will be used)
 def p'' : point nat := { x := 10, y := 10, z := 20 }
--- Copy all data from `p` using `..p` (extended `structure` only)
+-- Copy all data from `p` using `..p` (`structure` only)
 def rgp : red_green_point nat := { red := 200, green := 40, blue := 0, no_blue := rfl, ..p }
 
 -- Automatically generated data field accessor / projector
 example : rgp.x   = 10  := rfl
 example : rgp.red = 200 := rfl
+-- Given an expression `p.foo x y z`, Lean will insert `p` at the first non-implicit argument
+-- to `foo` **of type `point`**!
 
 
 end inductive_types
+section the_prop_universe
+
+--------------------------------------------------------------------------------
+-- **The `Prop` universe**
+
+/-
+By virtue of the Curry-Howard correspondence, propositions can be represented as types.
+*The universe inhabited by all proposition types is called `Prop` in Lean.*
+(We could do very well without this! But in order to better support axioms and "proof irrelevance",
+ Lean's inventors used a separate universe for propositions, so that they could be specifically treated...?)
+
+Inside this universe, there are predefined types `false` and `true` (just like `empty` and `unit` in other universes).
+Also there are some type constructors:
+
+* `(∧) : Prop → Prop → Prop`
+* `(∨) : Prop → Prop → Prop`
+* `→` is an alternate version of `Π`            (primitive notion)
+* `(↔) : Prop → Prop → Prop`
+* `not : Prop → Prop`
+
+The last two constructors are dependently typed:
+
+* `∀` is a literal synonym for `Π`              (primitive notion)
+* `Exists : Π {α : Sort u}, (α → Prop) → Prop`  (not a primitive notion)
+-/
+
+#check false
+#check @false.elim
+#check true
+#check true.intro
+
+#check and
+#check or
+-- → is Π
+#check iff
+#check not
+
+-- ∀ is Π
+-- Usage: `∀ (x : ℕ), x = x`
+--   this is equvalent to `Π (x : ℕ), x = x`, which is the type of a function that produces
+--   a term of type `x = x` upon being given any element `x` of type `ℕ`.
+#check @Exists.{1}
+-- Usage: `@Exists ℕ (λ (x : ℕ), x = x)` or `∃ (x : ℕ), x = x`
+--   where `ℕ` and `a = a` are types of the first element `a` and the second element in a
+--   Σ (dependent pair), respectively.
+
+/-
+The introduction / elimination rules for these types are largely the same as ×, ⊕, Σ, etc.
+(However, due to the restriction in "universe levels", they could only "eliminate into a type in the `Prop` universe".)
+
+The `Prop` universe is specially treated when determining the "universe level" for a Π type.
+Namely, in the Π-introduction rule, suppose we have `Γ ⊢ (α : Sort i)` and `Γ, (x : α) ⊢ (β a : Sort j)`,
+Then `Γ ⊢ (Π (x : α), β x : Sort (imax i j))`, where `imax i j` is `0` if `j = 0`, and `max i j` otherwise.
+In this way, if `β` is a proposition depending on `x`, then `Π (x : α), β x` is again a proposition.
+
+(TODO: Girard's paradox; why an impredicative `Prop` is OK)
+See: https://lean-forward.github.io/logical-verification/2018/41_notes.html
+See: https://github.com/leanprover-community/mathlib/blob/2be593d90712ec763811f8fe4db7b66f33461cae/src/logic/girard.lean
+See: https://leanprover.zulipchat.com/#narrow/stream/113488-general/topic/Type.20in.20type/near/233041033
+
+#####
+-/
+
+
+end the_prop_universe
 section definitional_equality
 
 --------------------------------------------------------------------------------
@@ -942,6 +1016,8 @@ section definitional_equality
 -- See: https://leanprover.github.io/reference/expressions.html#computation
 
 /-
+In Lean, some expressions are considered as "the same".
+
 We have seen that `#reduce` could:
 * Expand functions defined by `λ` expressions ("β-reduction")
 * Expand `let`s                               ("ζ-reduction" - term invented by Lean's creators)
@@ -1077,7 +1153,7 @@ section
 end
 
 -- See: https://leanprover.github.io/reference/declarations.html#inductive-families
--- In general, the "inductive-formation" rule is used by the `inductive` keyword:
+-- In general, we can extend the theory (global context) using the `inductive` keyword:
 /-
 `inductive <family-name> [parameters...] : Π(...), ..., Π (...), Sort <level>`
 `| <constructor-name-1> : Π(...), ..., Π(...), <family-name> [indices]`
@@ -1417,7 +1493,7 @@ section
   #reduce Expr.no_confusion_type P (Expr.Add (Expr.I 10) (Expr.I 20)) (Expr.Add (Expr.I 1) (Expr.I 2))
 end
 
--- Now we try to prove the "no_confusion" lemmata for `mynat` and `tree`:
+-- Now we try to prove the "no_confusion" lemmas for `mynat` and `tree`:
 
 namespace mynat
   lemma my_no_confusion : Π {P : Sort u} {n m : mynat}
@@ -1445,70 +1521,6 @@ end tree
 
 
 end inductive_families
-
---------------------------------------------------------------------------------
--- **The `Prop` universe**
-
-/-
-By virtue of the Curry-Howard correspondence, propositions can be represented as types.
-The universe inhabited by all proposition types is called `Prop` in Lean.
-
-Inside this universe, there are predefined types `true` and `false`.
-Also there are some "type constructors" (i.e. functions that take types as input and produce types):
-
-* `(∧) : Prop → Prop → Prop`
-* `(∨) : Prop → Prop → Prop`
-* `(→) : Sort u_1 → Sort u_2 → Sort (imax u_1 u_2)` (`Prop → Prop → Prop` is a special case)
-* `(↔) : Prop → Prop → Prop`
-* `not : Prop → Prop`
-
-The last two constructors are dependently typed:
-
-* `∀` is a literal synonym for `Π`                (primitive notion)
-* `Exists : Π {α : Sort u_1}, (α → Prop) → Prop`  (not a primitive notion)
--/
-
-#check true
-#check true.intro
-#check false
-#check @false.elim
-
-#check (∧)
-#check (∨)
-#check (→)
-#check (↔)
-#check not
-
--- ∀ is Π
--- Usage: `∀ (x : ℕ), x = x`
---   this is equvalent to `Π (x : ℕ), x = x`, which is the type of a function that produces
---   a term of type `x = x` upon being given any element `x` of type `ℕ`.
-#check @Exists.{1}
--- Usage: `@Exists ℕ (λ (x : ℕ), x = x)`
---   where `ℕ` and `a = a` are types of the first element `a` and the second element in a
---   Σ (dependent pair), respectively.
-
-/-
-For the introduction / elimination rules for these types, see:
-
-* https://leanprover.github.io/logic_and_proof/
-* https://leanprover.github.io/theorem_proving_in_lean/propositions_and_proofs.html
-* https://leanprover.github.io/theorem_proving_in_lean/quantifiers_and_equality.html
-
-The `Prop` universe is specially treated when determining the "universe level" for a Π type.
-Namely, in the Π-introduction rule, suppose we have `Γ ⊢ (α : Sort i)` and `Γ, (x : α) ⊢ (β a : Sort j)`,
-Then `Γ ⊢ (Π (x : α), β x : Sort (imax i j))`, where `imax i j` is `0` if `j = 0`, and `max i j` otherwise.
-In this way, if `β` is a proposition depending on `x`, then `Π (x : α), β x` is again a proposition.
-
-The original purpose of "universe levels" is to avoid self-referential quantifications, i.e.
-
-TODO: #####
-
-"In particular, we can define predicates on α by quantifying over all predicates on α...???"
-
--/
-
-
 section equation_compiler
 
 --------------------------------------------------------------------------------
@@ -1523,59 +1535,51 @@ Let's try some additional functionalities provided by Lean's elaborator...
 
 
 end equation_compiler
-
-
---------------------------------------------------------------------------------
--- Typeclasses
-
-namespace hidden_typeclasses
-
-class inhabited (α : Type _) :=
-  mk :: (default : α)
-
-instance Prop_inhabited : inhabited Prop :=
-  inhabited.mk true
-
-instance bool_inhabited : inhabited bool :=
-  inhabited.mk tt
-
-instance nat_inhabited : inhabited nat :=
-  inhabited.mk 0
-
-instance unit_inhabited : inhabited unit :=
-  inhabited.mk ()
-
-def default (α : Type*) [s : inhabited α] : α :=
-  @inhabited.default α s
-
-#reduce default Prop
-#reduce default bool
-#reduce default nat
-#reduce default unit
-
-
-
-end hidden_typeclasses
+namespace typeclasses
 
 --------------------------------------------------------------------------------
+-- **Typeclasses**
 
-namespace hidden_subtypes
+inductive inhabited (α : Type u) : Type u
+| mk : α → inhabited
 
-inductive my_subtype {α : Type u} (p : α → Prop) : Type u
-| mk : Π x : α, p x → my_subtype
+#check @inhabited.mk ℕ 1
 
-section
-  variables {α : Type u} (p : α → Prop)
-  
-  #check @my_subtype
-  #check (α → Prop) → Type u
-  #check Π {α : Type u}, (α → Prop) → Type u
+-- This theorem only holds for inhabited `α`s...
+theorem exists_eq_self : Π (α : Type u) (h : inhabited α), ∃ (x : α), x = x :=
+  λ α h, inhabited.rec (λ x, ⟨x, eq.refl _⟩) h
 
-  #check @my_subtype α p
-  #check {x : α // p x}
-end
+-- Now we specialize it for `ℕ`...
+theorem exists_nat_eq_self : ∃ (x : ℕ), x = x := exists_eq_self ℕ (inhabited.mk 1)
+-- Problem: could we save writing a `h` every time we want to invoke `exists_eq_self`?
+-- Lean's elaborator can do it for us; "typeclasses" could provide hints!
 
-end hidden_subtypes
+@[class] -- Add this line in front of the declaration to make it a "typeclass"...
+inductive inhabited' (α : Type u) : Type u
+| mk : α → inhabited'
+
+-- Then use `instance` to tell Lean about how to make `h`'s for different `α`s...
+-- (`instance` is a special `def`!)
+instance : inhabited' Prop :=
+  inhabited'.mk true
+instance : inhabited' bool :=
+  inhabited'.mk tt
+instance : inhabited' nat :=
+  ⟨0⟩
+instance : inhabited' unit :=
+  ⟨()⟩
+
+-- This theorem only holds for inhabited `α`s... (note that we are using `[]` instead of `()`)
+theorem exists_eq_self' : Π (α : Type u) [h : inhabited' α], ∃ (x : α), x = x :=
+  λ α h, inhabited'.rec (λ x, ⟨x, eq.refl _⟩) h
+
+-- Now we specialize it for `ℕ`...
+theorem exists_nat_eq_self' : ∃ (x : ℕ), x = x := exists_eq_self' ℕ -- No need to provide an `h`!
+
+-- (TODO: complete this part)
+
+
+end typeclasses
 
 --------------------------------------------------------------------------------
 -- **Extensionality axioms**
@@ -1767,7 +1771,7 @@ end axiom_of_choice
 /-
 ### Interacting with Lean
 
-[](https://leanprover.github.io/theorem_proving_in_lean/interacting_with_lean.html)
+(TODO: https://leanprover.github.io/theorem_proving_in_lean/interacting_with_lean.html)
 
 * Importing files
 * Sections
