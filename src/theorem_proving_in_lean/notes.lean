@@ -1539,7 +1539,10 @@ namespace typeclasses
 
 --------------------------------------------------------------------------------
 -- **Typeclasses**
+-- An inductive type that acts as a "constraint" on other types!
 
+-- If we can make a term of type `inhabited α`, it means that `α` is inhabited.
+--   => The term can be regarded as a "constraint" on `α`.
 inductive inhabited (α : Type u) : Type u
 | mk : α → inhabited
 
@@ -1559,7 +1562,7 @@ inductive inhabited' (α : Type u) : Type u
 | mk : α → inhabited'
 
 -- Then use `instance` to tell Lean about how to make `h`'s for different `α`s...
--- (`instance` is a special `def`!)
+-- (`instance` is a special `def`! Lean's elaborator will remember this recipe from now on.)
 instance : inhabited' Prop :=
   inhabited'.mk true
 instance : inhabited' bool :=
@@ -1569,14 +1572,57 @@ instance : inhabited' nat :=
 instance : inhabited' unit :=
   ⟨()⟩
 
--- This theorem only holds for inhabited `α`s... (note that we are using `[]` instead of `()`)
+-- This theorem only holds for inhabited `α`s... (Note that we are using `[]` instead of `()`)
 theorem exists_eq_self' : Π (α : Type u) [h : inhabited' α], ∃ (x : α), x = x :=
   λ α h, inhabited'.rec (λ x, ⟨x, eq.refl _⟩) h
 
 -- Now we specialize it for `ℕ`...
-theorem exists_nat_eq_self' : ∃ (x : ℕ), x = x := exists_eq_self' ℕ -- No need to provide an `h`!
+theorem exists_nat_eq_self' : ∃ (x : ℕ), x = x := exists_eq_self' ℕ -- No need to provide an `h` again!
 
--- (TODO: complete this part)
+-- Make an extractor
+def default (α : Type u) [h : inhabited' α] : α :=
+  inhabited'.rec_on h id
+
+-- "Chaining instances":
+instance {α β : Type u} [inhabited' α] [inhabited' β] : inhabited' (prod α β) :=
+  ⟨(default α, default β)⟩
+#check default (ℕ × bool) -- Automatically inferred using the above definition...?
+
+
+-- Use typeclasses for a function:
+-- First, make a typeclass... (in practice this should lie in the global namespace)
+@[class]
+inductive has_add (α : Type u) : Type u
+| mk : (α → α → α) → has_add
+
+-- Make an extractor (in practice this should lie in the global namespace)
+def add {α : Type u} [h : has_add α] : α → α → α :=
+  has_add.rec_on h id
+
+-- Make a notation! (in practice this should lie in the global namespace)
+notation a ` + ` b := add a b
+
+instance : has_add nat := has_add.mk nat.add
+#reduce add 1 2
+-- #reduce 1 + 2 (were there no naming clash, this should work)
+
+
+universes v
+-- We also have the following definitions in Lean's standard library:
+
+instance {α : Type u} {β : Type v} [has_add α] [has_add β] : has_add (α × β) :=
+  ⟨λ ⟨a₁, b₁⟩ ⟨a₂, b₂⟩, ⟨a₁ + a₂, b₁ + b₂⟩⟩
+-- #check (1, 2) + (3, 4)  -- ℕ × ℕ
+-- #reduce (1, 2) + (3, 4) -- (4, 6)
+
+instance {α : Type u} {β : Type v} [has_add β] : has_add (α → β) :=
+  ⟨λ f g x, f x + g x⟩
+-- #check (λ x : nat, 1) + (λ x, 2)  -- ℕ → ℕ
+-- #reduce (λ x : nat, 1) + (λ x, 2) -- λ (x : ℕ), 3
+
+
+
+
 
 
 end typeclasses
