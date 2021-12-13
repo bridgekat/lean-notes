@@ -25,6 +25,7 @@ namespace vector
   | fsucc : Π {n : ℕ}, fin n → fin n.succ
 
   -- This is guaranteed to be exhaustive (the equation compiler could identify it!)
+  -- (TODO: make clear)
   def get_element {α : Type} : Π {n : ℕ}, vector α n → fin n → α
   | _ (vcons x _)  fin.fzero      := x
   | _ (vcons _ xs) (fin.fsucc fn) := get_element xs fn
@@ -41,6 +42,20 @@ inductive hlist : list Type → Type 1
 
 namespace hlist
 
+/-
+  def head' {α : Type} {αs : list Type} : hlist (α :: αs) → α :=
+    λ ls, @hlist.rec_on
+      -- This motive says: given an empty hlist, we eliminate into `unit`;
+      --   otherwise, we eliminate into `α` (the type of the first element).
+      (λ ls _, @list.rec Type (λ _, Type) unit (λ α αs _, α) ls)
+      -- Indices and the term
+      (α :: αs) ls
+      -- Empty case
+      unit.star
+      -- Nonempty case
+      (λ α αs a as _, a)
+-/
+
   def head' {α : Type} {αs : list Type} : hlist (α :: αs) → α
   | (cons a as) := a
 
@@ -49,11 +64,12 @@ namespace hlist
 
   instance base : has_to_string (hlist []) :=
     ⟨λ ls, "[]"⟩
-  
+
   instance step {α : Type} {αs : list Type} [has_to_string α] [has_to_string (hlist αs)] : has_to_string (hlist (α :: αs)) :=
-    ⟨λ ls, match ls with
-    | (cons a as) := to_string a ++ " : " ++ to_string as
-    end⟩
+    ⟨λ ls,
+      match ls with
+      | (cons a as) := to_string a ++ " : " ++ to_string as
+      end⟩
 
   open native
   meta def example_list := cons "gg" (cons 233 (cons (1.2 : float) nil))

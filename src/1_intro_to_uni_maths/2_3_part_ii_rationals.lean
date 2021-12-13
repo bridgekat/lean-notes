@@ -33,9 +33,15 @@ namespace myrat
   lemma eqv_trans : ∀ x y z, x ∼ y → y ∼ z → x ∼ z :=
     λ ⟨a, b, hb⟩ ⟨c, d, hd⟩ ⟨e, f, hf⟩ h₁ h₂, by
     { unfold eqv at *,
-      have h : a * d * c * f = e * d * c * b,
-      { rw [h₁, ← h₂], sorry },
-      sorry }
+      cases classical.em (c = 0) with hc hc, -- TODO: `decidable_eq`
+      { have h₁ : a * d = 0 * d, { sorry, /- rewrite_search [h₁, hc, myint.mul_comm, myint.mul_assoc, myint.mul_zero], -/ },
+        replace h₁ : a = 0 := myint.mul_right_cancel _ _ _ hd h₁,
+        have h₂ : 0 * d = e * d, { sorry, },
+        replace h₂ : 0 = e := myint.mul_right_cancel _ _ _ hd h₂,
+        simp [h₁, ← h₂, myint.zero_mul], },
+      have h : d * (c * (a * f)) = d * (c * (e * b)),
+      { sorry, /- rewrite_search [myint.mul_comm, myint.mul_assoc, h₁, h₂] -/ },
+      exact (myint.mul_left_cancel _ _ _ hc (myint.mul_left_cancel _ _ _ hd h)) }
 
   lemma eqv_equivalence_relation : is_equivalence_relation (∼) :=
     ⟨eqv_refl, eqv_symm, eqv_trans⟩
@@ -132,6 +138,9 @@ section
   def inv_fn : Π (x : ℤ × ℤ*), (x.fst ≠ 0) → ℤ × ℤ* :=
     λ ⟨a, b, hb⟩ ha, (b, ⟨a, ha⟩)
 
+  def inv_fn' : Π (x : ℤ × ℤ*)
+
+/-
   lemma inv_respects :
     ∀ (x₁ x₂ : ℤ × ℤ*), (x₁ ∼ x₂) → (inv_fn x₁ ∼ inv_fn x₂)
   :=
@@ -145,6 +154,7 @@ section
   def inv : ℚ → ℚ :=
     quot.map inv_fn inv_respects
   instance : has_inv ℚ := ⟨inv⟩
+-/
 
 -- Less or equal than
   def le_fn : ℤ × ℤ* → ℤ × ℤ* → Prop :=

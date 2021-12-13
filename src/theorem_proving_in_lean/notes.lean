@@ -456,7 +456,7 @@ Then `Γ          ⊢ (α ⊕ β : Sort n)`
 
 Π-introduction:
 If   `Γ, (x : α) ⊢ (b(x) : β(x))`
-Then `Γ          ⊢ (λ x, b(x) : Π (x : α), β(x))`
+Then `Γ          ⊢ (λ (x : α), b(x) : Π (x : α), β(x))`
 
 Σ-introduction:
 If   `Γ          ⊢ (a : α), (b : β(a))`
@@ -464,7 +464,7 @@ Then `Γ          ⊢ ((a, b) : Σ (x : α), β(x))` (resultant type must be wel
 
 →-introduction:
 If   `Γ, (x : α) ⊢ (b(x) : β)`
-Then `Γ          ⊢ (λ x, b(x) : α → β)`
+Then `Γ          ⊢ (λ (x : α), b(x) : α → β)`
 
 ×-introduction:
 If   `Γ          ⊢ (a : α), (b : β)`
@@ -1003,8 +1003,7 @@ In this way, if `β` is a proposition depending on `x`, then `Π (x : α), β x`
 See: https://lean-forward.github.io/logical-verification/2018/41_notes.html
 See: https://github.com/leanprover-community/mathlib/blob/2be593d90712ec763811f8fe4db7b66f33461cae/src/logic/girard.lean
 See: https://leanprover.zulipchat.com/#narrow/stream/113488-general/topic/Type.20in.20type/near/233041033
-
-#####
+See: Mario Carneiro's thesis
 -/
 
 
@@ -1355,7 +1354,7 @@ plus the new terms produced by "recursive calls" (if the corresponding construct
 Special case: if the inductive type lives in `Prop`, the `λ(x : <family-name...> [indices])` part in the motive
 will vanish (proof irrelevance?), and the motive could only return a `Prop`!
 
-(Special case in special case: singleton elimination, as in our `myeq`s...)
+(Special case in special case: subsingleton elimination, as in our `myeq`s...)
 -/
 
 
@@ -1413,8 +1412,6 @@ namespace mynat
   -- When trying to define the "extractor" function for `some`, we found it impossible to
   -- define it for the `none` case. (Consider `extract (none : option empty)`!)
 
-  -- (TODO: complete)
-
 end mynat
 
 /-
@@ -1447,13 +1444,15 @@ namespace option
 end option
 -/
 
--- Another option is to combine PA3 and PA4 together, in one dependently-typed function!
--- By cases on constructors of `a` and `b`:
---   If both of them are `zero`s (resp. `none`), return a `true` (useless return value)
---   If one of them is `zero` and one of them is `succ _` (resp. `none` and `some _`),
---     return a proof of `a ≠ b` (PA3)
---   If one is `succ a'` and the other is `succ b'` (resp. `some a'` and `some b'`), extract `a'` and `b'`
---     and return a proof of `a = b → a' = b'` (PA4)
+/-
+Another option is to combine PA3 and PA4 together, in one dependently-typed function!
+By cases on constructors of `a` and `b`:
+  If both of them are `zero`s (resp. `none`), return a `true` (useless return value)
+  If one of them is `zero` and one of them is `succ _` (resp. `none` and `some _`),
+    return a proof of `a ≠ b` (PA3)
+  If one is `succ a'` and the other is `succ b'` (resp. `some a'` and `some b'`), extract `a'` and `b'`
+    and return a proof of `a = b → a' = b'` (PA4)
+-/
 
 /-
 For the naturals, PA3 and PA4 ensure that every time you apply `succ` on an existing natural,
@@ -1539,7 +1538,7 @@ namespace typeclasses
 
 --------------------------------------------------------------------------------
 -- **Typeclasses**
--- An inductive type that acts as a "constraint" on other types!
+-- Inductive types that serve as "constraints" or "additional information" of other types!
 
 -- If we can make a term of type `inhabited α`, it means that `α` is inhabited.
 --   => The term can be regarded as a "constraint" on `α`.
@@ -1583,28 +1582,37 @@ theorem exists_nat_eq_self' : ∃ (x : ℕ), x = x := exists_eq_self' ℕ -- No 
 def default (α : Type u) [h : inhabited' α] : α :=
   inhabited'.rec_on h id
 
--- "Chaining instances":
+
+-- **"Chaining instances"**:
+-- Instance definitions could depend on other instance terms!
+-- Lean will recurse and find out.
+
+-- (`instance` is a special `def`... The type signature must be in the form of `Π ..., <class-name> <type-name>`!)
 instance {α β : Type u} [inhabited' α] [inhabited' β] : inhabited' (prod α β) :=
   ⟨(default α, default β)⟩
-#check default (ℕ × bool) -- Automatically inferred using the above definition...?
+
+#check default (ℕ × bool)
+
+-- For a recursive example, see `src/functional_programming/hlist.lean`.
 
 
--- Use typeclasses for a function:
+-- **Use typeclasses for overloading functions**:
 -- First, make a typeclass... (in practice this should lie in the global namespace)
 @[class]
 inductive has_add (α : Type u) : Type u
 | mk : (α → α → α) → has_add
+-- This `(α → α → α)` is the type of the function (addition) we want to overload.
 
 -- Make an extractor (in practice this should lie in the global namespace)
 def add {α : Type u} [h : has_add α] : α → α → α :=
   has_add.rec_on h id
 
 -- Make a notation! (in practice this should lie in the global namespace)
-notation a ` + ` b := add a b
+local notation a ` + ` b := add a b
 
 instance : has_add nat := has_add.mk nat.add
 #reduce add 1 2
--- #reduce 1 + 2 (were there no naming clash, this should work)
+#reduce 1 + 2
 
 
 universes v
@@ -1612,16 +1620,104 @@ universes v
 
 instance {α : Type u} {β : Type v} [has_add α] [has_add β] : has_add (α × β) :=
   ⟨λ ⟨a₁, b₁⟩ ⟨a₂, b₂⟩, ⟨a₁ + a₂, b₁ + b₂⟩⟩
--- #check (1, 2) + (3, 4)  -- ℕ × ℕ
--- #reduce (1, 2) + (3, 4) -- (4, 6)
+#check (1, 2) + (3, 4)  -- `ℕ × ℕ`
+#reduce (1, 2) + (3, 4) -- `(4, 6)`
 
 instance {α : Type u} {β : Type v} [has_add β] : has_add (α → β) :=
   ⟨λ f g x, f x + g x⟩
--- #check (λ x : nat, 1) + (λ x, 2)  -- ℕ → ℕ
--- #reduce (λ x : nat, 1) + (λ x, 2) -- λ (x : ℕ), 3
+#check (λ x : ℕ, 1) + (λ x, 2)  -- `ℕ → ℕ`
+#reduce (λ x : ℕ, 1) + (λ x, 2) -- `λ (x : ℕ), 3`
 
 
+-- Another important one: **decidable propositions**:
+@[class]
+inductive decidable : Prop → Type -- (This is defined to land in `Type`...)
+| is_false : Π {p : Prop}, ¬p → decidable p
+| is_true  : Π {p : Prop},  p → decidable p
+-- It is much like "p ∨ ¬p"!
 
+-- We could do "definition/proof by cases" on decidable propositions without invoking LEM!
+-- e.g. the `if ... then ... else ...` statement is a syntactic sugar for `ite`, which requires the proposition to be decidable:
+
+def ite : Π {α : Type u} (p : Prop) [decidable p] (a : α) (b : α), α :=
+  λ α p hp a b, @decidable.rec_on (λ _ _, α) p hp (λ _ _, b) (λ _ _, a)
+
+-- There is also a "dependent" version of `ite`: (when will we need this?)
+#check @dite
+
+-- Decidability is preserved under propositional connectives:
+#check @and.decidable
+-- `Π {p q : Prop} [hp : decidable p] [hq : decidable q], decidable (p ∧ q)`
+#check @or.decidable
+#check @not.decidable
+#check @implies.decidable
+-- Moreover, propositions `true` and `false` are both decidable (trivially!):
+instance : decidable true := decidable.is_true trivial
+instance : decidable false := decidable.is_false id
+
+
+open nat
+#print definition decidable_pred
+#print definition decidable_rel
+#print definition decidable_eq
+
+-- Let's try making `1 = 1` an instance of `decidable`...
+instance one_eq_one_is_decidable : decidable (1 = 1) :=
+  decidable.is_true (eq.refl _)
+
+-- Given some `n : ℕ`, make `n = 1` an instance of `decidable`...
+instance n_eq_three_is_decidable : Π (n : ℕ), decidable (n = 1) :=
+  λ n, nat.cases_on n
+    (decidable.is_false (λ h : (0 = 1), nat.no_confusion h))
+    (λ n', nat.cases_on n'
+      (decidable.is_true rfl)
+      (λ n'', decidable.is_false (λ h, nat.no_confusion (succ.inj h))))
+
+-- Given some `n m : ℕ`, make `n = m` an instance of `decidable`...
+-- (We have to do this recursively!)
+instance n_eq_m_is_decidable : Π (n m : ℕ), decidable (n = m)
+| zero     zero     := decidable.is_true rfl
+| zero     (succ n) := decidable.is_false (λ h, nat.no_confusion h)
+| (succ n) zero     := decidable.is_false (λ h, nat.no_confusion h)
+| (succ n) (succ m) :=
+  match n_eq_m_is_decidable n m with
+  | (decidable.is_false h) := decidable.is_false (λ h', h (succ.inj h'))
+  | (decidable.is_true h)  := decidable.is_true (h ▸ rfl)
+  end
+
+-- Now ℕ has "decidable equality"
+-- Each time we write the type `n = m` (where `n m : ℕ`), Lean will synthesise
+-- `h : decidable (n = m)` using the above recipe! So we could use them in `ite`:
+#reduce ite (3 = 3) 1 2
+#reduce ite (3 = 4) 1 2
+variables a b : ℕ
+#reduce ite (a = b) 1 2
+-- (Similarly, inequality can also be made decidable.)
+
+section
+  open classical
+  local attribute [instance] prop_decidable -- This makes every proposition decidable!
+  -- (i.e. it creates a recipe `Π (p : Prop), decidable p`)
+end
+
+-- If a proposition is decidable and does not involve free variables, `dec_trivial` could prove it!
+-- (This amounts to use Lean's typeclass inference mechanism mentioned above to synthesise
+--  an instance of `decidable` for the current proposition... If nothing blocks computation,
+--  that instance will reduce to either `is_true ...` or `is_false ...`!)
+-- See: https://leanprover.github.io/theorem_proving_in_lean/type_classes.html
+
+example : 1 ≠ 0 ∧ (5 < 2 ∨ 3 < 7) := dec_trivial
+example : 1 ≠ 0 ∧ (5 < 2 ∨ 3 < 7) := begin exact dec_trivial end
+
+
+-- Some useful `#print`s:
+-- #print classes
+-- #print instances inhabited'
+
+example : _root_.decidable (1 ≠ 0 ∧ (5 < 2 ∨ 3 < 7)) := infer_instance
+example : _root_.decidable (1 ≠ 0 ∧ (5 < 2 ∨ 3 < 7)) := begin apply_instance end
+
+-- (TODO: complete)
 
 
 
@@ -1769,12 +1865,10 @@ def add_fn' : ℕ × ℕ → myint → myint :=
   λ x, quot.lift (add_fn x) (add_respects_snd x)
 
 -- Lift first argument
-lemma add_respects'' : ∀ x x' : ℕ × ℕ, eqv x x' → add_fn' x = add_fn' x' :=
+lemma add_respects' : ∀ x x' : ℕ × ℕ, eqv x x' → add_fn' x = add_fn' x' :=
   λ x x' h, funext (λ y, quot.ind (λ y, (add_respects_fst x x' y h)) y)
-
--- Lifted function
 def add : myint → myint → myint :=
-  quot.lift add_fn' add_respects''
+  quot.lift add_fn' add_respects'
 
 -- In fact, this "double-lift" is already implemented in mathlib (in exactly the same way as above)!
 -- (Add `import data.quot` in the beginning of the file)
@@ -1814,9 +1908,9 @@ section axiom_of_choice
 end axiom_of_choice
 
 --------------------------------------------------------------------------------
-/-
-### Interacting with Lean
+-- **Interacting with Lean**
 
+/-
 (TODO: https://leanprover.github.io/theorem_proving_in_lean/interacting_with_lean.html)
 
 * Importing files

@@ -28,9 +28,20 @@ namespace myint
   lemma eqv_trans : ∀ x y z, x ∼ y → y ∼ z → x ∼ z :=
     λ ⟨a, b⟩ ⟨c, d⟩ ⟨e, f⟩ h₁ h₂, by
     { unfold eqv at *,
-      have h : a + d + c + f = e + d + c + b,
-      { rw [h₁, ← h₂], sorry },
-      sorry }
+      have h : (d + c) + (a + f) = (d + c) + (e + b),
+      { -- `rewrite_search` is my dream tactic!
+        /- rewrite_search? [h₁, h₂] -/
+        conv_lhs { congr, skip, erw [mynat.add_comm] },
+        conv_lhs { erw [mynat.add_assoc, mynat.add_comm] },
+        conv_lhs { congr, erw [←mynat.add_assoc] },
+        conv_lhs { erw [mynat.add_assoc] },
+        conv_lhs { congr, erw [h₂] },
+        conv_rhs { erw [←mynat.add_assoc] },
+        conv_rhs { congr, erw [mynat.add_comm, ←mynat.add_assoc] },
+        conv_rhs { erw [mynat.add_assoc] },
+        conv_rhs { congr, skip, erw [←h₁] }
+        /- end -/ },
+      exact mynat.add_left_cancel _ _ _ h }
 
   lemma eqv_equivalence_relation : is_equivalence_relation (∼) :=
     ⟨eqv_refl, eqv_symm, eqv_trans⟩
@@ -60,7 +71,13 @@ section
     rintros ⟨a₁, b₁⟩ ⟨a₂, b₂⟩ ⟨c, d⟩ h,
     unfold add_fn at *,
     unfold eqv at *,
-    sorry
+    /- rewrite_search? [h] -/
+    conv_lhs { congr, erw [mynat.add_comm] },
+    conv_lhs { erw [mynat.add_assoc] },
+    conv_lhs { congr, skip, erw [←mynat.add_assoc] },
+    conv_lhs { congr, skip, congr, erw [h] },
+    ac_refl
+    /- end -/
   end
 
   lemma add_respects_snd :
@@ -70,7 +87,14 @@ section
     rintros ⟨a, b⟩ ⟨c₁, d₁⟩ ⟨c₂, d₂⟩ h,
     unfold add_fn at *,
     unfold eqv at *,
-    sorry
+    /- rewrite_search? [h] -/
+    conv_lhs { congr, skip, erw [mynat.add_comm] },
+    conv_lhs { erw [mynat.add_assoc] },
+    conv_lhs { congr, skip, erw [←mynat.add_assoc] },
+    conv_lhs { congr, skip, congr, erw [h] },
+    conv_rhs { congr, skip, erw [mynat.add_comm] },
+    ac_refl
+    /- end -/
   end
 
   def add : ℤ → ℤ → ℤ :=
@@ -106,7 +130,26 @@ section
     rintros ⟨a₁, b₁⟩ ⟨a₂, b₂⟩ ⟨c, d⟩ h,
     unfold mul_fn at *,
     unfold eqv at *,
-    sorry
+    have : (a₁ + b₂) * c + (a₂ + b₁) * d = (a₂ + b₁) * c + (a₁ + b₂) * d,
+    { rw h },
+    calc  a₁ * c + b₁ * d + (a₂ * d + b₂ * c)
+        = (a₁ + b₂) * c + (a₂ + b₁) * d : by
+        { /- rewrite_search? -/
+          conv_lhs { congr, skip, erw [mynat.add_comm] },
+          conv_lhs { erw [mynat.add_assoc] },
+          conv_lhs { congr, skip, erw [mynat.add_comm, mynat.add_assoc] },
+          conv_rhs { congr, erw [mynat.add_mul], skip, erw [mynat.add_mul] },
+          conv_rhs { erw [mynat.add_assoc] }
+          /- end -/ }
+    ... = (a₂ + b₁) * c + (a₁ + b₂) * d : by rw h
+    ... = a₂ * c + b₂ * d + (a₁ * d + b₁ * c) : by
+        { /- rewrite_search? -/
+          conv_lhs { congr, erw [mynat.add_mul], skip, erw [mynat.add_mul] },
+          conv_lhs { erw [mynat.add_assoc] },
+          conv_rhs { erw [mynat.add_assoc] },
+          conv_rhs { congr, skip, erw [←mynat.add_assoc, mynat.add_comm] },
+          conv_rhs { congr, skip, congr, skip, erw [mynat.add_comm] }
+          /- end -/ }
   end
 
   lemma mul_respects_snd :
@@ -114,9 +157,13 @@ section
   :=
   begin
     rintros ⟨a, b⟩ ⟨c₁, d₁⟩ ⟨c₂, d₂⟩ h,
-    unfold mul_fn at *,
-    unfold eqv at *,
-    sorry
+    have : mul_fn ⟨a, b⟩ ⟨c₁, d₁⟩ = mul_fn ⟨c₁, d₁⟩ ⟨a, b⟩,
+    { unfold mul_fn at *, cc },
+    rw this,
+    have : mul_fn ⟨a, b⟩ ⟨c₂, d₂⟩ = mul_fn ⟨c₂, d₂⟩ ⟨a, b⟩,
+    { unfold mul_fn at *, cc },
+    rw this,
+    exact mul_respects_fst _ _ _ h,
   end
 
   def mul : ℤ → ℤ → ℤ :=
@@ -194,104 +241,151 @@ section
   instance : has_one ℤ := ⟨one⟩
 
   lemma zero_ne_one :
-    zero ≠ one
+    (0 : ℤ) ≠ 1
   :=
+  begin
+    intros h,
+    let f : ℕ × ℕ → Prop := λ ⟨a, b⟩, ite (b = 0) false true,
     sorry
+  end
 end
 
 section
   local infix ` ∼ ` : 50 := eqv
   variables (x y z : ℤ)
 
-  @[simp]
+  @[simp, rewrite]
   theorem add_assoc :
     (x + y) + z = x + (y + z)
   :=
   begin
-    sorry
+    revert x y z, rintros ⟨a, b⟩ ⟨c, d⟩ ⟨e, f⟩,
+    change (quot.mk eqv (a + c + e, b + d + f) =
+            quot.mk eqv (a + (c + e), b + (d + f))),
+    rw [add_assoc, add_assoc]
   end
 
-  @[simp]
+  @[simp, rewrite]
   theorem zero_add :
-    zero + x = x
+    0 + x = x
   :=
   begin
-    sorry
+    revert x, rintros ⟨a, b⟩,
+    change (quot.mk eqv (0 + a, 0 + b) = quot.mk eqv (a, b)),
+    rw [zero_add, zero_add]
   end
 
-  @[simp]
+  @[simp, rewrite]
   theorem add_zero :
-    x + zero = x
+    x + 0 = x
   :=
   begin
-    sorry
+    revert x, rintros ⟨a, b⟩,
+    change (quot.mk eqv (a + 0, b + 0) = quot.mk eqv (a, b)),
+    refl
   end
 
-  @[simp]
+  @[simp, rewrite]
   theorem neg_add :
-    (-x) + x = zero
+    (-x) + x = 0
   :=
   begin
-    sorry
+    revert x, rintros ⟨a, b⟩,
+    change (quot.mk eqv (b + a, a + b) = quot.mk eqv (0, 0)),
+    rw add_comm,
+    apply quot.sound,
+    unfold eqv,
+    simp
   end
 
-  @[simp]
+  @[simp, rewrite]
   theorem add_neg :
-    x + (-x) = zero
+    x + (-x) = 0
   :=
   begin
-    sorry
+    revert x, rintros ⟨a, b⟩,
+    change (quot.mk eqv (a + b, b + a) = quot.mk eqv (0, 0)),
+    rw add_comm,
+    apply quot.sound,
+    unfold eqv,
+    simp
   end
 
-  --@[simp]
+  @[rewrite]
   theorem add_comm :
     x + y = y + x
   :=
   begin
-    sorry
+    revert x y, rintros ⟨a, b⟩ ⟨c, d⟩,
+    change (quot.mk eqv (a + c, b + d) = quot.mk eqv (c + a, d + b)),
+    rw [add_comm a c, add_comm b d]
   end
 
-  @[simp]
+  @[simp, rewrite]
   theorem mul_assoc :
     (x * y) * z = x * (y * z)
   :=
   begin
-    sorry
+    revert x y z, rintros ⟨a, b⟩ ⟨c, d⟩ ⟨e, f⟩,
+    change (quot.mk eqv ((a * c + b * d) * e + (a * d + b * c) * f, (a * c + b * d) * f + (a * d + b * c) * e) =
+            quot.mk eqv (a * (c * e + d * f) + b * (c * f + d * e), a * (c * f + d * e) + b * (c * e + d * f))),
+    simp only [mynat.mul_assoc, mynat.add_assoc, mynat.mul_add, mynat.add_mul],
+    apply quot.sound,
+    unfold eqv,
+    simp only [mynat.add_assoc, add_right_inj],
+    /- TODO: how to automate here? -/
+    conv_lhs { rw mynat.add_comm }, simp only [mynat.add_assoc],
+    conv_lhs { congr, skip, congr, skip, rw mynat.add_comm, congr, rw mynat.add_comm, congr, rw mynat.add_comm, congr, rw mynat.add_comm }, simp only [mynat.add_assoc],
+    conv_lhs { congr, skip, congr, skip, congr, skip, rw mynat.add_comm, congr, rw mynat.add_comm, congr, rw mynat.add_comm }, simp only [mynat.add_assoc],
+    conv_lhs { congr, skip, congr, skip, congr, skip, congr, skip, rw mynat.add_comm, congr, rw mynat.add_comm }, simp only [mynat.add_assoc],
+    conv_lhs { congr, skip, congr, skip, congr, skip, congr, skip, congr, skip, rw mynat.add_comm },
+    /- `rhs: a * (d * f) + (b * (c * f) + (b * (d * e) + (a * (c * f) + (b * (d * f) + (a * (d * e) + b * (c * e))))))` -/
   end
 
-  @[simp]
+  @[simp, rewrite]
   theorem one_mul :
-    one * x = x
+    1 * x = x
   :=
   begin
-    sorry
+    revert x, rintros ⟨a, b⟩,
+    change (quot.mk eqv (1 * a + 0 * b, 1 * b + 0 * a) = quot.mk eqv (a, b)),
+    simp
   end
 
-  @[simp]
+  @[simp, rewrite]
   theorem mul_one :
-    x * one = x
+    x * 1 = x
   :=
   begin
-    sorry
+    revert x, rintros ⟨a, b⟩,
+    change (quot.mk eqv (a * 1 + b * 0, a * 0 + b * 1) = quot.mk eqv (a, b)),
+    simp
   end
 
-  --@[simp]
+  @[rewrite]
   theorem mul_comm :
     x * y = y * x
   :=
   begin
-    sorry
+    revert x y, rintros ⟨a, b⟩ ⟨c, d⟩,
+    change (quot.mk eqv (a * c + b * d, a * d + b * c) =
+            quot.mk eqv (c * a + d * b, c * b + d * a)),
+    rw [mul_comm a c, mul_comm b d, mul_comm a d, mul_comm b c, mynat.add_comm (d * a)]
   end
 
-  @[simp]
+  @[simp, rewrite]
   theorem add_mul :
     (x + y) * z = x * z + y * z
   :=
   begin
-    sorry
+    revert x y z, rintros ⟨a, b⟩ ⟨c, d⟩ ⟨e, f⟩,
+    change (quot.mk eqv ((a + c) * e + (b + d) * f, (a + c) * f + (b + d) * e) =
+            quot.mk eqv ((a * e + b * f) + (c * e + d * f), (a * f + b * e) + (c * f + d * e))),
+    simp only [add_mul],
+    ac_refl,
   end
 
-  @[simp]
+  @[simp, rewrite]
   lemma mul_add : x * (y + z) = x * y + x * z :=
     by rw [mul_comm, add_mul, mul_comm y x, mul_comm z x]
 
@@ -305,21 +399,28 @@ section
     x + z = y + z → x = y
   :=
   begin
-    sorry
+    intros h,
+    calc  x
+        = x + z + -z : by rw [add_assoc, add_neg, add_zero]
+    ... = y + z + -z : by rw h
+    ... = y          : by rw [add_assoc, add_neg, add_zero]
   end
 
   lemma add_left_cancel : z + x = z + y → x = y :=
     by { rw [add_comm z x, add_comm z y], exact add_right_cancel _ _ _ }
 
   theorem mul_right_cancel :
-    z ≠ zero → x * z = y * z → x = y
+    z ≠ 0 → x * z = y * z → x = y
   :=
   begin
-    sorry
+    revert x y z, rintros ⟨a, b⟩ ⟨c, d⟩ ⟨e, f⟩ hef h,
+    change (quot.mk eqv (a * e + b * f, a * f + b * e) =
+            quot.mk eqv (c * e + d * f, c * f + d * e)) at h,
+    
   end
 
-  lemma mul_left_cancel : z ≠ zero → z * x = z * y → x = y :=
-    by { rw [mul_comm z x, mul_comm z y], exact mul_right_cancel _ _ _ }
+  lemma mul_left_cancel : x ≠ 0 → x * y = x * z → y = z :=
+    by { rw [mul_comm x y, mul_comm x z], exact mul_right_cancel _ _ _ }
 
 end
 

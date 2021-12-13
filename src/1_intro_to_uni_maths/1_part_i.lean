@@ -1,5 +1,4 @@
 import tactic
-noncomputable theory
 
 namespace notes
 
@@ -237,8 +236,6 @@ section
   def is_partition (A : set (set X)) : Prop :=
     ∀ x : X, ∃! a, a ∈ A ∧ x ∈ a
 end
-
--- TODO: rewrite?
 
 section
   variables (r : X → X → Prop) (hr : is_equivalence_relation r)
