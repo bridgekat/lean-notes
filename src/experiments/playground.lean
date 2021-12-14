@@ -4,21 +4,6 @@ import tactic
 import system.io
 open io
 
-
-structure vertex3 (α : Type*) := mk :: (x : α) (y : α) (z : α)
-
-#check @vertex3.{0}
-#check @vertex3.rec_on.{1}
-#check @vertex3.x.{0}
-#check @vertex3.y.{0}
-#check @vertex3.z.{0}
-
-#print prefix vertex3
-
-#reduce vertex3.x (vertex3.mk 10 20 30)
-#eval vertex3.y (vertex3.mk 10 20 30)
-#eval vertex3.z (vertex3.mk 10 20 30)
-
 def hello_world : io unit :=
   put_str_ln "Hello, world!" >>= λ _,
   put_str_ln "Hello world again!" >>= λ _,

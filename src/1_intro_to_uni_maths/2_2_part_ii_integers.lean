@@ -76,7 +76,9 @@ section
     conv_lhs { erw [mynat.add_assoc] },
     conv_lhs { congr, skip, erw [←mynat.add_assoc] },
     conv_lhs { congr, skip, congr, erw [h] },
-    ac_refl
+    conv_rhs { congr, erw [mynat.add_comm] },
+    conv_rhs { erw [mynat.add_assoc] },
+    conv_rhs { congr, skip, erw [←mynat.add_assoc] }
     /- end -/
   end
 
@@ -93,7 +95,8 @@ section
     conv_lhs { congr, skip, erw [←mynat.add_assoc] },
     conv_lhs { congr, skip, congr, erw [h] },
     conv_rhs { congr, skip, erw [mynat.add_comm] },
-    ac_refl
+    conv_rhs { erw [mynat.add_assoc] },
+    conv_rhs { congr, skip, erw [←mynat.add_assoc] }
     /- end -/
   end
 
@@ -333,13 +336,13 @@ section
     apply quot.sound,
     unfold eqv,
     simp only [mynat.add_assoc, add_right_inj],
-    /- TODO: how to automate here? -/
+    /- TODO: how to automate here? `ac_refl` does not work... -/
     conv_lhs { rw mynat.add_comm }, simp only [mynat.add_assoc],
     conv_lhs { congr, skip, congr, skip, rw mynat.add_comm, congr, rw mynat.add_comm, congr, rw mynat.add_comm, congr, rw mynat.add_comm }, simp only [mynat.add_assoc],
     conv_lhs { congr, skip, congr, skip, congr, skip, rw mynat.add_comm, congr, rw mynat.add_comm, congr, rw mynat.add_comm }, simp only [mynat.add_assoc],
     conv_lhs { congr, skip, congr, skip, congr, skip, congr, skip, rw mynat.add_comm, congr, rw mynat.add_comm }, simp only [mynat.add_assoc],
     conv_lhs { congr, skip, congr, skip, congr, skip, congr, skip, congr, skip, rw mynat.add_comm },
-    /- `rhs: a * (d * f) + (b * (c * f) + (b * (d * e) + (a * (c * f) + (b * (d * f) + (a * (d * e) + b * (c * e))))))` -/
+    /- rhs: `a * (d * f) + (b * (c * f) + (b * (d * e) + (a * (c * f) + (b * (d * f) + (a * (d * e) + b * (c * e))))))` -/
   end
 
   @[simp, rewrite]
@@ -382,7 +385,7 @@ section
     change (quot.mk eqv ((a + c) * e + (b + d) * f, (a + c) * f + (b + d) * e) =
             quot.mk eqv ((a * e + b * f) + (c * e + d * f), (a * f + b * e) + (c * f + d * e))),
     simp only [add_mul],
-    ac_refl,
+    ac_refl
   end
 
   @[simp, rewrite]
@@ -414,9 +417,17 @@ section
   :=
   begin
     revert x y z, rintros ⟨a, b⟩ ⟨c, d⟩ ⟨e, f⟩ hef h,
-    change (quot.mk eqv (a * e + b * f, a * f + b * e) =
-            quot.mk eqv (c * e + d * f, c * f + d * e)) at h,
-    
+    rcases mynat.lt_trichotomy e f with ⟨g, hg⟩ | ⟨g, hg₁, hg₂⟩ | ⟨g, hg₁, hg₂⟩,
+    apply quot.sound,
+    { sorry },
+    { have h := calc
+            quot.mk eqv (a * g, b * g)
+          = quot.mk eqv (a * e + b * f, a * f + b * e) : by sorry
+      ... = quot.mk eqv (c * e + d * f, c * f + d * e) : h
+      ... = quot.mk eqv (c * g, d * g) : by sorry,
+      -- change a * g + d * g = c * g + b * g at h,
+      sorry },
+    { sorry }
   end
 
   lemma mul_left_cancel : x ≠ 0 → x * y = x * z → y = z :=

@@ -1,6 +1,7 @@
 import tactic
 import tactic.rewrite_search.frontend
 import .«1_part_i»
+noncomputable theory
 
 namespace notes
 
@@ -57,7 +58,7 @@ namespace mynat
 -- Less or equal than
   def le (m n : mynat) : Prop :=
     ∃ (v : mynat), n = m + v
-  instance : has_le mynat := ⟨le⟩
+  instance has_le : has_le mynat := ⟨le⟩
 
 -- Less than
   def lt (m n : mynat) : Prop :=
@@ -297,8 +298,7 @@ end
 -- `ℕ` is a "commutative semiring" with `add_left_cancel` and `mul_left_cancel`!
 -- I found some relevant typeclasses in Lean:
 
-instance add_cancel_comm_monoid :
-  add_cancel_comm_monoid mynat :=
+instance add_cancel_comm_monoid : add_cancel_comm_monoid mynat :=
   { add             := mynat.add,
     add_assoc       := mynat.add_assoc,
     add_left_cancel := mynat.add_left_cancel,
@@ -307,8 +307,7 @@ instance add_cancel_comm_monoid :
     add_zero        := mynat.add_zero,
     add_comm        := mynat.add_comm }
 
-instance comm_semiring :
-  comm_semiring mynat :=
+instance comm_semiring : comm_semiring mynat :=
   { mul             := mynat.mul,
     left_distrib    := mynat.mul_add,
     right_distrib   := mynat.add_mul,
@@ -538,26 +537,23 @@ end
 
 #print classes
 
-#check is_well_order
+#check is_well_order -- TODO
 
-instance linear_order :
-  linear_order mynat :=
+instance linear_order : linear_order mynat :=
   let ⟨hrefl, hantisymm, htrans, htotal⟩ := mynat.le_total_order in
     { le           := mynat.le,
       le_refl      := @hrefl,
       le_antisymm  := @hantisymm,
       le_trans     := @htrans,
       le_total     := @htotal,
-      decidable_le := sorry }
+      decidable_le := λ (l r : ℕ), classical.prop_decidable (l ≤ r) }
 
-instance linear_ordered_semiring :
-  linear_ordered_semiring mynat :=
+instance ordered_semiring : ordered_semiring mynat :=
   { add_le_add_left         := sorry,
     le_of_add_le_add_left   := sorry,
-    zero_le_one             := sorry,
+    zero_le_one             := sorry, -- Does anyone know why this would not work?
     mul_lt_mul_of_pos_left  := sorry,
     mul_lt_mul_of_pos_right := sorry,
-    exists_pair_ne          := sorry,
     ..mynat.add_cancel_comm_monoid,
     ..mynat.comm_semiring,
     ..mynat.linear_order }
