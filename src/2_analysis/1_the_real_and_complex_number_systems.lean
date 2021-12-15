@@ -26,6 +26,7 @@ noncomputable theory
 
 section
   variables (x y z : ℝ)
+  variables (S : set ℝ)
 
   #check real.field
   #check real.linear_order
@@ -77,6 +78,7 @@ section
 -- Completeness axiom (existence & uniqueness of supremum)
   #check real.has_Sup
   #check Sup (λ x : ℝ, x < 1)           --  ℝ (noncomputable?)
+  #check real.is_lub_Sup S              --  S.nonempty → bdd_above S → is_lub S (Sup S)
 
 -- Miscellaneous
 -- Conversion between minus and negation
@@ -114,13 +116,17 @@ section
   structure bounded_below {α : Type} [linear_order α] (E : set α) : Type :=
     mk :: (a : α) (h : is_lower_bound E a)
 
-  -- (TODO: complete)
+-- (TODO: complete)
 
 end
 
 --------------------------------------------------------------------------------
 -- **Fields**
--- The following can be done using `simp` or `norm_num`
+-- The following can be done using `simp` or `norm_num` (or even `library_search`!)
+-- I did most by hand just to gain familiarity with field axioms (and their Lean names...)
+
+-- (It would be better if we had an UI that completely avoids the use of "names" to refer to theorems...
+--  i.e. use type ascriptions only, relying more heavily on library_search and unification algorithms)
 
 section
 
@@ -238,7 +244,12 @@ section
 
   end propositions_1_16
 
-  variables [linear_ordered_field α]
+end
+
+section
+
+  variables (α : Type) [linear_ordered_field α]
+  variables (x y z : α)
 
   section propositions_1_18
 
@@ -256,9 +267,113 @@ section
         ... < x + 0  : add_lt_add_left h x
         ... = x      : by rw add_zero }}
 
+    #check @mul_lt_mul_left _ _ y z x           -- 0 < x → (x * y < x * z ↔ y < z)
+    #check @mul_lt_mul_right _ _ y z x          -- 0 < x → (y * x < z * x ↔ y < z)
+    example : 0 < x → y < z → x * y < x * z := by
+    { intros hx h,
+      let a := z + -y,
+      have ha : 0 < a,
+      { have := add_lt_add_right h (-y),
+        rw add_right_neg at this,
+        exact this },
+      have h₁ : x * y < x * y + x * a,
+      { have : 0 < x * a := mul_pos hx ha,
+        replace this := add_lt_add_left this (x * y),
+        rw add_zero at this,
+        exact this },
+      calc  x * y
+          < x * (y + a)        : by { rw mul_add, exact h₁ }
+      ... = x * (y + (z + -y)) : rfl
+      ... = x * z              : by { rw [add_comm z, ← add_assoc, add_right_neg, zero_add] }}
+
+    #check @mul_lt_mul_left_of_neg _ _ y z x    -- x < 0 → (x * y < x * z ↔ z < y)
+    #check @mul_lt_mul_right_of_neg _ _ y z x   -- x < 0 → (y * x < z * x ↔ z < y)
+    example : x < 0 → y < z → x * z < x * y := by
+    { intros hx h,
+      let a := z + -y,
+      have ha : 0 < a,
+      { have := add_lt_add_right h (-y),
+        rw add_right_neg at this,
+        exact this },
+      have h₁ : x * y + x * a < x * y,
+      { have : 0 < -x * a,
+        { have hnx : 0 < -x,
+          { calc  0
+                = -x + x : by rw add_left_neg
+            ... < -x + 0 : add_lt_add_left hx (-x)
+            ... = -x     : by rw add_zero },
+          exact mul_pos hnx ha },
+        replace this := add_lt_add_left this (x * y),
+        rw add_zero at this,
+        replace this := add_lt_add_right this (x * a),
+        rw [add_assoc, ← add_mul, add_left_neg, zero_mul, add_zero] at this,
+        exact this },
+      calc  x * z
+          = x * (y + (z + -y)) : by { rw [add_comm z, ← add_assoc, add_right_neg, zero_add] }
+      ... = x * (y + a)        : rfl
+      ... < x * y              : by { rw mul_add, exact h₁ }}
+
+    #check @mul_self_pos _ _ x                  -- x ≠ 0 → 0 < x * x
+    example : x ≠ 0 → 0 < x * x := by
+    { intros hx',
+      rcases lt_trichotomy x 0 with (hx|hx|hx),
+      { have : x * 0 < x * x := (mul_lt_mul_left_of_neg hx).mpr hx,
+        rw mul_zero at this,
+        exact this },
+      { exfalso, exact hx' hx },
+      { have : x * 0 < x * x := (mul_lt_mul_left hx).mpr hx,
+        rw mul_zero at this,
+        exact this }}
     
+    #check zero_lt_one                          -- 0 < 1
+    example : (0 : α) < 1 := by
+    { have : (0 : α) < 1 * 1 := mul_self_pos one_ne_zero,
+      rw mul_one at this,
+      exact this }
+
+    #check @inv_pos _ _ x                       -- 0 < x⁻¹ ↔ 0 < x
+    example : 0 < x → 0 < x⁻¹ := by
+    { intros hx,
+      have hx₀ : x ≠ 0, { intros hx', rw hx' at hx, exact lt_irrefl 0 hx },
+      rcases lt_trichotomy x⁻¹ 0 with (h|h|h),
+      { exfalso,
+        have := (mul_lt_mul_left hx).mpr h,
+        rw [mul_inv_cancel hx₀, mul_zero] at this,
+        exact lt_irrefl _ (lt_trans zero_lt_one this) },
+      { exfalso,
+        have : x * x⁻¹ = 0, { rw [h, mul_zero] },
+        rw mul_inv_cancel hx₀ at this,
+        exact one_ne_zero this },
+      { exact h }}
+
+-- example (hx : 0 < x) (h : x < y) : y⁻¹ < x⁻¹ := by library_search!
+    example : 0 < x → x < y → y⁻¹ < x⁻¹ := by
+    { intros hx h,
+      have hy := lt_trans hx h,
+      have := (mul_lt_mul_left (inv_pos.mpr hx)).mpr h,
+      rw inv_mul_cancel (λ hx' : x = 0, by { rw hx' at hx, exact lt_irrefl _ hx }) at this,
+      replace this := (mul_lt_mul_right (inv_pos.mpr hy)).mpr this,
+      rw mul_assoc at this,
+      rw mul_inv_cancel (λ hy' : y = 0, by { rw hy' at hy, exact lt_irrefl _ hy }) at this,
+      rw [one_mul, mul_one] at this,
+      exact this }
 
   end propositions_1_18
+
+-- Some other useful lemmas
+
+  lemma le_iff_not_gt : x ≤ y ↔ ¬ y < x := by
+  { split,
+    { intros h h',
+      rcases le_iff_lt_or_eq.mp h with (h₁|h₁),
+      { exact lt_irrefl _ (lt_trans h' h₁) }, { rw h₁ at h', exact lt_irrefl _ h' }},
+    { intros h,
+      apply le_iff_lt_or_eq.mpr,
+      rcases lt_trichotomy x y with (h₁|h₁|h₁),
+      { exact or.inl h₁ }, { exact or.inr h₁ }, { exfalso, exact h h₁ }}}
+
+  #check @lt_iff_not_ge _ _ x y                 -- x < y ↔ ¬x ≥ y
+  #check @le_iff_not_gt _ _ x y                 -- x ≤ y ↔ ¬y < x
 
 end
 
@@ -266,6 +381,57 @@ end
 -- **The real field**
 
 section
+-- (TODO: how to express "ℝ contains ℚ as a subfield"...)
+
+  variables (x y z : ℝ)
+
+  #check real.archimedean.arch
+  theorem real.archimedean' : 0 < x → ∃ n : ℕ, y < n • x := by
+-- Proof using the least-upper-bound property
+  { intros hx,
+    -- Assume otherwise...
+    by_contra,
+    -- Let A be the set of all nx's...
+    let A : set ℝ := (λ z : ℝ, ∃ n : ℕ, z = n • x),
+    -- Clearly A is nonempty, and bounded above by y...
+    have hne  : A.nonempty := ⟨1 • x, ⟨1, rfl⟩⟩,
+    have hbdd : bdd_above A,
+    { use y,
+      rintros z ⟨n, hn⟩,
+      apply (le_iff_not_gt _ _ _).mpr,
+      intros hyz,
+      apply h, use n,
+      rw ← hn, exact hyz },
+    -- So we let a := sup A...
+    let a := Sup A,
+    rcases (real.is_lub_Sup A hne hbdd) with ⟨ha₁, ha₂⟩,
+    unfold lower_bounds at ha₂,
+    -- And let b := a - x...
+    let b := a + -x,
+    -- Then b < mx for some m : ℕ...
+    have hb : ∃ m : ℕ, b < m • x,
+    { by_contra,
+      have hb' : b ∈ upper_bounds A,
+      { rintros z ⟨mz, hz⟩,
+        apply (le_iff_not_gt _ _ _).mpr,
+        intros hbz,
+        apply h, use mz, rw ← hz, exact hbz },
+      replace hb' := ha₂ hb',
+      change Sup A ≤ Sup A - x at hb',
+      linarith only [hb', hx] },
+    rcases hb with ⟨m, hb⟩,
+    -- Then a < (m + 1) x, contradiction...
+    have h₁ : a < (m + 1) • x,
+    { rw [add_smul, one_smul],
+      have : a + -x < m • x + x + -x,
+      { rw [add_assoc, add_right_neg, add_zero], exact hb },
+      replace this := add_lt_add_right this x,
+      simp only [add_assoc, add_left_neg, add_zero] at this,
+      exact this },
+    have : (m + 1) • x ∈ A := ⟨m + 1, rfl⟩,
+    specialize ha₁ this,
+    change Sup A < (m + 1) • x at h₁,
+    linarith only [h₁, ha₁] }
 
 
 
