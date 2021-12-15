@@ -326,6 +326,7 @@ section
         exact this }}
     
     #check zero_lt_one                          -- 0 < 1
+    #check neg_one_lt_zero                      -- -1 < 0
     example : (0 : α) < 1 := by
     { have : (0 : α) < 1 * 1 := mul_self_pos one_ne_zero,
       rw mul_one at this,
@@ -372,7 +373,7 @@ section
       rcases lt_trichotomy x y with (h₁|h₁|h₁),
       { exact or.inl h₁ }, { exact or.inr h₁ }, { exfalso, exact h h₁ }}}
 
-  #check @lt_iff_not_ge _ _ x y                 -- x < y ↔ ¬x ≥ y
+  #check @lt_iff_not_ge _ _ x y                 -- x < y ↔ ¬y ≤ x (def eq)
   #check @le_iff_not_gt _ _ x y                 -- x ≤ y ↔ ¬y < x
 
 end
@@ -381,7 +382,7 @@ end
 -- **The real field**
 
 section
--- (TODO: how to express "ℝ contains ℚ as a subfield"...)
+-- (TODO: `has_coe ℚ ℝ`)
 
   variables (x y z : ℝ)
 
@@ -408,7 +409,7 @@ section
     unfold lower_bounds at ha₂,
     -- And let b := a - x...
     let b := a + -x,
-    -- Then b < mx for some m : ℕ...
+    -- Then b < mx for some m : ℕ (since a is least)...
     have hb : ∃ m : ℕ, b < m • x,
     { by_contra,
       have hb' : b ∈ upper_bounds A,
@@ -418,9 +419,9 @@ section
         apply h, use mz, rw ← hz, exact hbz },
       replace hb' := ha₂ hb',
       change Sup A ≤ Sup A - x at hb',
-      linarith only [hb', hx] },
+      linarith [hb', hx] },
     rcases hb with ⟨m, hb⟩,
-    -- Then a < (m + 1) x, contradiction...
+    -- Then a < (m + 1) x, contradiction (since a is upper bound)...
     have h₁ : a < (m + 1) • x,
     { rw [add_smul, one_smul],
       have : a + -x < m • x + x + -x,
@@ -431,10 +432,76 @@ section
     have : (m + 1) • x ∈ A := ⟨m + 1, rfl⟩,
     specialize ha₁ this,
     change Sup A < (m + 1) • x at h₁,
-    linarith only [h₁, ha₁] }
+    linarith [h₁, ha₁] }
 
+  theorem real.rat_dense' : x < y → ∃ p : ℚ, x < ↑p ∧ ↑p < y := by
+-- Proof using the Archimedean property
+  { intros h,
+    -- Since y - x > 0, we have an n : ℕ such that n (y - x) > 1...
+    -- (1 / n < y - x will be our "unit")
+    have hyx : 0 < y + -x,
+    { have := add_lt_add_right h (-x),
+      rw add_right_neg at this,
+      exact this },
+    rcases real.archimedean' _ 1 hyx with ⟨n, hn⟩,
+    -- Also, there are (m₁ m₂ : ℕ) such that -m₁ < nx < m₂...
+    rcases real.archimedean' 1 (-(n • x)) zero_lt_one with ⟨m₁, hm₁⟩,
+    rw [nat.smul_one_eq_coe] at hm₁,
+    replace hm₁ : - ↑m₁ < n • x,
+    { replace hm₁ := (mul_lt_mul_left_of_neg neg_one_lt_zero).mpr hm₁,
+      simp only [← neg_eq_neg_one_mul, neg_neg] at hm₁,
+      exact hm₁ },
+    rcases real.archimedean' 1 (n • x) zero_lt_one with ⟨m₂, hm₂⟩,
+    rw [nat.smul_one_eq_coe] at hm₂,
+    -- So, there is an m : ℤ such that m - 1 ≤ nx < m...
+    let m : ℤ := sorry,
+    have hml : ↑(m + -1) ≤ n • x := sorry,
+    have hmr : n • x < ↑m        := sorry,
+    -- Then m ≤ nx + 1 < ny...
+    replace hml : ↑m ≤ n • x + 1,
+    { sorry },
+    -- So x < m / n < y...
+    use (↑m : ℚ) / (↑n : ℚ), split,
+    { sorry },
+    { sorry }}
 
+  theorem real.exists_nth_root : ∀ n : ℕ, n ≠ 0 → ∃! y : ℝ, npow n y = x := by
+  { intros n hn,
+    -- Let E be the set consisting of all t : ℝ such that t > 0 and t^n < x...
+    let E : set ℝ := (λ t, 0 < t ∧ npow n t < x),
+    -- E is nonempty, since x / (x + 1) is in E...
+    -- E is bounded above by x + 1...
+    -- So we let y := sup E...
+    -- Lemma: b^n - a^n < (b - a) n b^(n - 1)...
+    -- * If y^n < x, choose h such that 0 < h < 1 and h < (x - y^n) / (n (y + 1)^(n - 1))...
+    --   Then (y + h)^n - y^n < h n (y + h)^(n - 1) < h n (y + 1)^(n - 1) < x - y^n...
+    --   So (y + h)^n < x, contradiction...
+    -- * If y^n = x, all good...
+    -- * If x < y^n, choose k := (y^n - x) / (n y^(n - 1)), then 0 < k < y...
+    --   * For all t such that y - k ≤ t, y^n - t^n ≤ y^n - (y - k)^n < k n y^(n - 1) = y^n - x...
+    --     So t^n > x, so t is not in E...
+    --   So y - k is an upper bound of E, contradiction...
+    sorry }
+
+  -- lemma...
+  -- (I might be giving up on this...)
 
 end
+
+--------------------------------------------------------------------------------
+-- **The extended real number system**
+-- (Nothing to do here...?)
+
+--------------------------------------------------------------------------------
+-- **The complex field**
+
+
+
+
+--------------------------------------------------------------------------------
+-- **Euclidean spaces**
+
+
+
 
 end notes
