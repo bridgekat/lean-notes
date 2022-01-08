@@ -14,6 +14,7 @@ import data.nat.basic
 import data.int.basic
 import data.rat.basic
 import data.real.basic
+import data.complex.basic
 import data.list
 
 import tactic
@@ -82,9 +83,9 @@ section
 
 -- Miscellaneous
 -- Conversion between minus and negation
-  #check sub_eq_add_neg x y             --  x - y = x + -y
+  #check sub_eq_add_neg x y             --  x - y = x + -y  (also def eq)
 -- Conversion between division and inverse
-  #check div_eq_mul_inv x y             --  x / y = x * y⁻¹
+  #check div_eq_mul_inv x y             --  x / y = x * y⁻¹ (also def eq)
 -- "smul by integer" as repeated addition
   #check nsmul 3 x                      --  ℝ (noncomputable?)
   #check gsmul (-3) x                   --  ℝ (noncomputable?)
@@ -94,6 +95,65 @@ section
 -- Maximum and minimum (?)
 end
 
+--------------------------------------------------------------------------------
+-- **The complex field** in Lean
+
+section
+  variables (x y z : ℂ)
+  variables (a b c d : ℝ)
+
+  #check complex.field
+
+-- Definition as a structure with two ℝ's
+-- Constructor
+  #reduce complex.mk a b
+  #reduce (⟨a, b⟩ : ℂ)
+-- Projectors
+  #check x.re                           --  ℝ
+  #check x.im                           --  ℝ
+-- Operations and identity elements
+  example :  (⟨a, b⟩ : ℂ) + (⟨c, d⟩ : ℂ) = ⟨a + c, b + d⟩ := rfl
+  example : -(⟨a, b⟩ : ℂ)                = ⟨-a, -b⟩       := rfl
+  example :       (0 : ℂ)                = ⟨0, 0⟩         := rfl
+  example :  (⟨a, b⟩ : ℂ) * (⟨c, d⟩ : ℂ) = ⟨a * c - b * d, a * d + b * c⟩ := rfl
+  example :  (⟨a, b⟩ : ℂ)⁻¹              = ⟨a, -b⟩ * ↑((a * a + b * b)⁻¹) := rfl
+  example :       (1 : ℂ)                = ⟨1, 0⟩         := rfl
+  example :  (⟨a, b⟩ : ℂ).conj           = ⟨a, -b⟩        := rfl
+
+-- Field axioms
+  #check add_assoc x y z                --  x + y + z = x + (y + z)
+  #check add_zero x                     --/ x + 0 = x
+  #check zero_add x                     --\ 0 + x = x
+  #check add_right_neg x                --/ x + -x = 0
+  #check add_left_neg x                 --\ -x + x = 0
+  #check add_comm x y                   --  x + y = y + x
+
+  #check mul_assoc x y z                --  x * y * z = x * (y * z)
+  #check @zero_ne_one ℝ _ _             --/ 0 ≠ 1
+  #check @one_ne_zero ℝ _ _             --\ 1 ≠ 0
+  #check mul_one x                      --/ x * 1 = x
+  #check one_mul x                      --\ 1 * x = x
+  #check @mul_inv_cancel _ _ x          --/ x ≠ 0 → x * x⁻¹ = 1
+  #check @inv_mul_cancel _ _ x          --\ x ≠ 0 → x⁻¹ * x = 1
+  #check mul_comm x y                   --  x * y = y * x
+
+  #check mul_add x y z                  --/ x * (y + z) = x * y + x * z
+  #check add_mul x y z                  --\ (x + y) * z = x * z + y * z
+
+-- Miscellaneous
+-- Conversion between minus and negation
+  #check sub_eq_add_neg x y             --  x - y = x + -y  (also def eq)
+-- Conversion between division and inverse
+  #check div_eq_mul_inv x y             --  x / y = x * y⁻¹ (also def eq)
+-- "smul by integer" as repeated addition
+  #check nsmul 3 x                      --  ℝ (noncomputable?)
+  #check gsmul (-3) x                   --  ℝ (noncomputable?)
+-- "pow by integer" as repeated multiplication
+  #check npow 3 x                       --  ℝ (noncomputable?)
+  #check gpow (-3) x                    --  ℝ (noncomputable?)
+-- Imaginary unit
+  example : complex.I = ⟨0, 1⟩ := rfl
+end
 
 namespace notes
 
@@ -324,7 +384,7 @@ section
       { have : x * 0 < x * x := (mul_lt_mul_left hx).mpr hx,
         rw mul_zero at this,
         exact this }}
-    
+
     #check zero_lt_one                          -- 0 < 1
     #check neg_one_lt_zero                      -- -1 < 0
     example : (0 : α) < 1 := by
@@ -362,7 +422,6 @@ section
   end propositions_1_18
 
 -- Some other useful lemmas
-
   lemma le_iff_not_gt : x ≤ y ↔ ¬ y < x := by
   { split,
     { intros h h',
@@ -372,7 +431,6 @@ section
       apply le_iff_lt_or_eq.mpr,
       rcases lt_trichotomy x y with (h₁|h₁|h₁),
       { exact or.inl h₁ }, { exact or.inr h₁ }, { exfalso, exact h h₁ }}}
-
   #check @lt_iff_not_ge _ _ x y                 -- x < y ↔ ¬y ≤ x (def eq)
   #check @le_iff_not_gt _ _ x y                 -- x ≤ y ↔ ¬y < x
 
@@ -419,7 +477,7 @@ section
         apply h, use mz, rw ← hz, exact hbz },
       replace hb' := ha₂ hb',
       change Sup A ≤ Sup A - x at hb',
-      linarith [hb', hx] },
+      linarith only [hb', hx] },
     rcases hb with ⟨m, hb⟩,
     -- Then a < (m + 1) x, contradiction (since a is upper bound)...
     have h₁ : a < (m + 1) • x,
@@ -432,7 +490,7 @@ section
     have : (m + 1) • x ∈ A := ⟨m + 1, rfl⟩,
     specialize ha₁ this,
     change Sup A < (m + 1) • x at h₁,
-    linarith [h₁, ha₁] }
+    linarith only [h₁, ha₁] }
 
   theorem real.rat_dense' : x < y → ∃ p : ℚ, x < ↑p ∧ ↑p < y := by
 -- Proof using the Archimedean property
@@ -465,8 +523,8 @@ section
     { sorry },
     { sorry }}
 
-  theorem real.exists_nth_root : ∀ n : ℕ, n ≠ 0 → ∃! y : ℝ, npow n y = x := by
-  { intros n hn,
+  theorem real.exists_nth_root' : 0 ≤ x → ∀ n : ℕ, n ≠ 0 → ∃! y : ℝ, npow n y = x := by
+  { intros hx n hn,
     -- Let E be the set consisting of all t : ℝ such that t > 0 and t^n < x...
     let E : set ℝ := (λ t, 0 < t ∧ npow n t < x),
     -- E is nonempty, since x / (x + 1) is in E...
@@ -481,7 +539,7 @@ section
     --   * For all t such that y - k ≤ t, y^n - t^n ≤ y^n - (y - k)^n < k n y^(n - 1) = y^n - x...
     --     So t^n > x, so t is not in E...
     --   So y - k is an upper bound of E, contradiction...
-    sorry }
+    sorry  }
 
   -- lemma...
   -- (I might be giving up on this...)
@@ -495,8 +553,51 @@ end
 --------------------------------------------------------------------------------
 -- **The complex field**
 
+section
 
+  variables (a b : ℝ)
+  variables (z w : ℂ)
 
+  example : (⟨a, 0⟩ : ℂ) + ⟨b, 0⟩ = ⟨a + b, 0⟩ := by
+  { have : (⟨a, 0⟩ : ℂ) + ⟨b, 0⟩ = ⟨a + b, 0 + 0⟩ := rfl,
+    rw add_zero at this,
+    exact this }
+
+  example : (⟨a, 0⟩ : ℂ) * ⟨b, 0⟩ = ⟨a * b, 0⟩ := by
+  { have : (⟨a, 0⟩ : ℂ) * ⟨b, 0⟩ = ⟨a * b - 0 * 0, a * 0 + 0 * b⟩ := rfl,
+    simp at this,
+    exact this }
+
+  example : complex.I = (⟨0, 1⟩ : ℂ)           := rfl
+  example : complex.I * complex.I = -1         := by simp
+  example : (⟨a, b⟩ : ℂ) = ↑a + ↑b * complex.I := by
+  { unfold complex.I,
+    change (⟨a, b⟩ : ℂ) = ⟨a + (b * 0 - 0 * 1), 0 + (b * 1 + 0 * 0)⟩,
+    simp }
+
+  section theorems_1_31
+
+    example : (z + w).conj = z.conj + w.conj := by
+    { unfold complex.conj, -- what? sorry.
+      sorry }
+
+    example : (z * w).conj = z.conj * w.conj := by
+    { sorry }
+
+    example : z + z.conj = 2 * z.re := by
+    { sorry }
+
+    example : z - z.conj = 2 * complex.I * z.im := by
+    { sorry }
+
+    -- (TODO: How to express "a complex number is real" in Lean?)
+    -- (d)
+
+  end theorems_1_31
+
+  #print complex.abs                            --  real.sqrt (⇑complex.norm_sq z)
+
+end
 
 --------------------------------------------------------------------------------
 -- **Euclidean spaces**

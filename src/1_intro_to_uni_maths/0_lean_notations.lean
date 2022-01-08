@@ -95,7 +95,7 @@ In Lean, the `subset` takes two `set`s and emits a `Prop`:
 
 #print set.univ
 #print notation ∅
-#print set.has_emptyc -- TODO: typeclasses
+#print set.has_emptyc
 /-
 In Lean, the `univ` emits a `set` (α is implicit):
   `def set.univ : Π {α : Type u}, set α :=`

@@ -142,6 +142,7 @@ parameter t : α -- Now we add assumption `t : α` to the context Γ.
 
 
 -- **Π-computation** and **Π-uniqueness**
+-- See: https://leanprover.github.io/reference/expressions.html#computation
 
 #check (λx, f x) t
 -- What we have done was using Π-introduction to introduce `(λx, f x)`, but after that
@@ -154,16 +155,13 @@ parameter t : α -- Now we add assumption `t : α` to the context Γ.
 -- Syntax: `#reduce <expr>`
 #reduce (λx, f x) t
 
--- *We should have another rule called "Π-uniqueness":*
-#reduce (λx, f x) -- ??? (TODO: why this does not eta-reduce...)
-
 -- If we view these expressions containing λ as functions...
 -- (TODO: complete this part)
 
 -- Note: "λ-abstraction" is "Π-introduction" in MLTT.
 --       "λ-application" is "Π-elimination" in MLTT.
 --       "β-reduction" is "Π-computation" in MLTT (also "cut-elimination" in natural deduction)
---       "η-reduction" is "Π-uniqueness" in MLTT.
+--       "η-equivalence" is "Π-uniqueness" in MLTT.
 
 -- If one expression could be "reduced" to another using the so-called "computation rules",
 -- we say that the two expressions are "judgmentally equal" or "definitionally equal".
@@ -803,6 +801,28 @@ will vanish, and the motive could only return a `Prop`!
 
 -- TODO: how are the allowed universe levels determined for `inductive`...?
 -- See: https://leanprover.github.io/theorem_proving_in_lean/inductive_types.html#axiomatic-details
+-- See: https://leanprover.github.io/reference/declarations.html#inductive-types
+-- "If `u > 0`, then for each type `βᵢⱼ : Sort v` occurring in the constructors, we must have `u ≥ v`..."
+
+-- TODO: on cardinality and "universes in set theory"
+-- TODO: why parameters and family indices are treated differently
+
+/-
+-- Experiment (corner case of singleton elimination)
+
+section
+  parameters (x : ℕ)
+  example : x + 0 = x := rfl
+end
+
+inductive proposition : ℕ → Prop
+| mk : Π (x : ℕ), proposition (x) -- Try changing to `(x + 0)`! Singleton elimination will no longer work.
+
+section
+  parameter h : proposition 2
+  def get_index : Π {n : ℕ}, proposition n → ℕ := λ n h, proposition.rec_on h (λ x, x)
+end
+-/
 
 
 --------------------------------------------------------------------------------
@@ -942,6 +962,23 @@ example : rgp.red = 200 := rfl
 -- Given an expression `p.foo x y z`, Lean will insert `p` at the first non-implicit argument
 -- to `foo` **of type `point`**!
 
+/-
+-- Experiment (no diamonds)
+
+namespace hidden
+
+  structure A :=
+    mk :: (a : ℕ)
+  structure B extends A :=
+    mk :: (b : ℕ)
+  structure C extends A :=
+    mk :: (c : ℕ)
+  structure D extends B, C := -- invalid 'structure' header, field 'to_A' from 'hidden.C' has already been declared
+    mk :: (d : ℕ)
+
+end hidden
+-/
+
 
 end inductive_types
 section the_prop_universe
@@ -952,8 +989,10 @@ section the_prop_universe
 /-
 By virtue of the Curry-Howard correspondence, propositions can be represented as types.
 *The universe inhabited by all proposition types is called `Prop` in Lean.*
-(We could do very well without this! But in order to better support axioms and "proof irrelevance",
- Lean's inventors used a separate universe for propositions, so that they could be specifically treated...?)
+(We could do very well without this! But in order to allow axioms and "proof irrelevance",
+  Lean's inventors used a separate universe for propositions, so that they could be specifically treated...?)
+(For example, if we adopt proof irrelevance but allow large elimination for all `Prop`, then we could
+  extract "different" things from the "same" thing (e.g. two existential proofs with different witnesses), contradiction!)
 
 Inside this universe, there are predefined types `false` and `true` (just like `empty` and `unit` in other universes).
 Also there are some type constructors:
@@ -1034,7 +1073,7 @@ parameters (a : α) (b : β)
 -- α-equivalent expressions have the same internal syntactical representation in Lean, thus are def eq:
 #check (eq.refl _ : (λ x : α, x) = (λ y : α, y))
 
--- TODO: `let` vs `λ`
+-- `let` vs `λ`
 def foo := (let a := nat in λ x : a, x + 2) -- Typechecks
 -- def bar := (λ α, λ x : α, x + 2) nat -- Does not typecheck
 
@@ -1255,7 +1294,7 @@ def Expr_eval : Π {α : Type}, Expr α → α :=
     (λ (α : Type) (x : Expr α), λ (xval : α), xval)      -- `Id`
     (λ (x y : Expr ℤ), λ (xval yval : ℤ), xval + yval)   -- `Add`
     (λ (x y : Expr ℤ), λ (xval yval : ℤ), xval * yval)   -- `Mul`
-    (λ (α : Type) (x y : Expr α), λ (xval yval : α), ff) -- `Eq` (TODO: add decidable_eq?)
+    (λ (α : Type) (x y : Expr α), λ (xval yval : α), ff) -- `Eq`
 
 section
   open Expr
@@ -1415,37 +1454,7 @@ namespace mynat
 end mynat
 
 /-
-[MAYBE WRONG WAY?]
-
-namespace option
-
-  -- Possible solution: make the "extractor" dependently-typed!
-  def extract_type : Π {α : Type} (a : option α), Type :=
-    λ α a, option.rec_on a
-      unit      -- `none` case: don't care
-      (λ _, α)  -- `some` case: extracts the thing
-  
-  def extract : Π {α : Type} (a : option α), extract_type a :=
-    λ α a, option.rec_on a
-      unit.star -- `none` case: don't care
-      (λ x, x)  -- `some` case: extracts the thing
-
-  #reduce extract_type (some 1)
-  #reduce extract_type (some 2)
-  -- #check extract (some 1) = extract (some 2) -- Oops, does not typecheck (TODO: because def eq is not transitive?)
-  #check @eq ℕ (extract (some 1)) (extract (some 2))
-
-  -- theorem some_inj : Π {α : Type} (a b : α), some a = some b → a = b :=
-  --   λ α a b h, @eq.subst _ (λ x, @eq α (extract (some a)) (extract x)) _ _ h (eq.refl (extract (some a)))
-  -- (Oops, does not typecheck!)
-
-  -- (TODO: complete)
-
-end option
--/
-
-/-
-Another option is to combine PA3 and PA4 together, in one dependently-typed function!
+Possible solution: combine PA3 and PA4 together, in one dependently-typed function!
 By cases on constructors of `a` and `b`:
   If both of them are `zero`s (resp. `none`), return a `true` (useless return value)
   If one of them is `zero` and one of them is `succ _` (resp. `none` and `some _`),
@@ -1528,9 +1537,361 @@ Now we have largely explored Lean's type theory (and MLTT, and how MLTT is repre
 Let's try some additional functionalities provided by Lean's elaborator...
 -/
 
--- **Recursion syntax and the Equation Compiler**
+-- **Pattern matching and the Equation Compiler**
+
+-- Uses `rec` (or sometimes `ite` with `decidable_eq`, see *Typeclasses*) behind the scenes
+def is_zero : ℕ → Prop
+| nat.zero     := true
+| (nat.succ x) := false
+
+-- "Because addition and the zero notation have been assigned the `[pattern]` attribute, they can be used in pattern matching.
+--   Lean simply unfolds these expressions until the constructors `zero` and `succ` are exposed."
+def is_zero' : ℕ → Prop
+| 0       := true
+| (x + 1) := false
+
+-- These still hold definitionally...
+example : is_zero 0 = true := rfl
+example : is_zero 3 = false := rfl
+
+-- More examples...
+def swap_pair {α β : Type u} : α × β → β × α
+| (a, b) := (b, a)
+
+def bnot' : bool → bool
+| tt := ff
+| ff := tt
+
+-- Can also be used in proofs
+theorem bnot'_bnot' : ∀ (b : bool), bnot' (bnot' b) = b
+| tt := rfl
+| ff := rfl
+
+example (p q : Prop) : p ∧ q → q ∧ p
+| (and.intro h₁ h₂) := and.intro h₂ h₁
+
+example (p q : Prop) : p ∨ q → q ∨ p
+| (or.inl hp) := or.inr hp
+| (or.inr hq) := or.inl hq
+
+-- Nested constructors in patterns (multiple case splits)
+def sub2 : ℕ → ℕ
+| 0                       := 0
+| (nat.succ 0)            := 0
+| (nat.succ (nat.succ a)) := a
+
+-- Again can use `0` and `+` in patterns
+def sub2' : ℕ → ℕ
+| 0       := 0
+| 1       := 0
+| (a + 2) := a
+
+example : sub2' 0 = 0 := rfl
+example : sub2' 1 = 0 := rfl
+example : sub2' 5 = 3 := rfl
+
+#print sub2'
+#print sub2'._main
+
+-- Case split on `fst`, then `snd`...
+def foo' : ℕ × ℕ → ℕ
+| (0, n)     := 0
+| (m+1, 0)   := 1
+| (m+1, n+1) := 2
+
+#print foo'._main
+
+-- Can match multiple arguments!
+-- (Case split on the first argument, then on the second)
+def foo'' : ℕ → ℕ → ℕ
+| 0     _     := 0
+| (m+1) 0     := 1
+| (m+1) (n+1) := 2
+
+#print foo''._main
+
+-- (Here splitting occurs only on the first argument)
+def cond' {a : Type} : bool → a → a → a
+| tt x y := x
+| ff x y := y
+
+#print cond'._main
+
+-- When patterns overlap, the first matching one will be used...
+-- (`ite` is now used!)
+def foo''' : ℕ → ℕ → ℕ
+| 0 _ := 0
+| _ 0 := 1
+| _ _ := 2
+
+#print foo'''._main
+
+section
+  variables (m n : ℕ)
+
+  example : foo''' 0     0     = 0 := rfl
+  example : foo''' 0     (n+1) = 0 := rfl
+  example : foo''' (m+1) 0     = 1 := rfl
+  example : foo''' (m+1) (n+1) = 2 := rfl
+end
+
+-- Another situation where it uses `ite`...
+def foo'''' : char → ℕ
+| 'A' := 1
+| 'B' := 2
+| _   := 3
+
+#print foo''''._main
+
+-- Non-exhaustive patterns are simulated using `arbitrary` or `option`:
+section
+  variables (a b : ℕ)
+
+  def f1 : ℕ → ℕ → ℕ
+  | 0  _  := 1
+  | _  0  := 2
+  | _  _  := arbitrary ℕ   -- The "undefined" case
+
+  example : f1 0     0     = 1 := rfl
+  example : f1 0     (a+1) = 1 := rfl
+  example : f1 (a+1) 0     = 2 := rfl
+  example : f1 (a+1) (b+1) = arbitrary ℕ := rfl
+
+  def f2 : ℕ → ℕ → option ℕ
+  | 0  _  := some 1
+  | _  0  := some 2
+  | _  _  := none          -- The "undefined" case
+
+  example : f2 0     0     = some 1 := rfl
+  example : f2 0     (a+1) = some 1 := rfl
+  example : f2 (a+1) 0     = some 2 := rfl
+  example : f2 (a+1) (b+1) = none   := rfl
+end
+
+-- A more complicated example:
+-- (It always does case split on the first argument first, then the second, then the third...)
+def bar : ℕ → list ℕ → bool → ℕ
+| 0     _        ff := 0 -- This line appears twice in the actual definition!
+| 0     (b :: _) _  := b
+| 0     []       tt := 7
+| (a+1) []       ff := a
+| (a+1) []       tt := a + 1
+| (a+1) (b :: _) _  := a + b
+
+#print bar._main
+
+-- In general, the equation compiler processes input of the following form:
+/-
+`def <function-name> (a :: α) : Π (b :: β), γ`
+`| [pattern-1] := <term-1>`
+`| [pattern-2] := <term-2>`
+`| ...`
+`| [pattern-n] := <term-n>`
+
+where `(a :: α)` is a sequence of parameters, `(b :: β)` is the sequence of arguments on which
+pattern matching takes place, and `γ` is any type, which can depend on `a`'s and `b`'s.
+Each line should contain the same number of patterns, one for each element of `β`.
+
+A pattern is either:
+* A variable;
+* A constructor applied to other patterns (this will prompt case split);
+* An expression that normalizes to something of that form
+  (where the non-constructors are marked with the `[pattern]` attribute). 
+-/
+
+-- We could also do pattern matching anywhere in an expression:
+def is_not_zero (m : ℕ) : bool :=
+  match m with
+  | 0     := ff
+  | (n+1) := tt
+  end
+
+section
+  variable {α : Type*}
+  variable p : α → bool
+
+  def filter : list α → list α
+  | []       := []
+  | (a :: l) :=
+    match p a with
+    | tt := a :: filter l
+    | ff := filter l
+    end
+
+  example : filter is_not_zero [1, 0, 0, 3, 0] = [1, 3] := rfl
+
+  -- Arguments and patterns are delimited by commas in `match`!
+  def foo2 (n : ℕ) (b c : bool) :=
+    5 + match n - 5, b && c with
+        | 0,      tt := 0
+        | m+1,    tt := m + 7
+        | 0,      ff := 5
+        | m+1,    ff := m + 3
+        end
+
+  #eval foo2 7 tt ff
+  example : foo2 7 tt ff = 9 := rfl
+
+end
+
+section
+  variables p q : ℕ → Prop
+
+  -- In a match with a single pattern, the vertical bar is optional:
+  example (h₀ : ∃ x, p x) (h₁ : ∃ y, q y) : ∃ x y, p x ∧ q y :=
+    match h₀, h₁ with ⟨x, px⟩, ⟨y, qy⟩ := ⟨x, y, px, qy⟩ end
+
+end
 
 
+--------------------------------------------------------------------------------
+-- **Recursion syntax**
+-- With the equation compiler, we can now write functions using "recursive calls"!
+
+-- However, such recursive functions must terminate. In the simplest case, we are just performing
+-- **structural recursion** (all recursive calls are made on a "structurally smaller" thing...):
+
+-- This is straightforward to translate into a definition using the recursor...
+def myadd (m : ℕ) : ℕ → ℕ
+| nat.zero     := m
+| (nat.succ n) := nat.succ (myadd n) -- (The "recursive call" is here)
+
+-- This is harder! But the EC automagically does it for us...
+def fib : ℕ → ℕ
+| 0       := 1
+| 1       := 1
+| (n + 2) := fib (n + 1) + fib n -- (Two "recursive calls"!)
+
+example : fib 0 = 1 := rfl
+example : fib 1 = 1 := rfl
+example (n : nat) : fib (n + 2) = fib (n + 1) + fib n := rfl
+
+-- (A better implementation of the above function)
+def fib_aux : ℕ → ℕ × ℕ
+| 0       := (0, 1)
+| (n + 1) := let p := fib_aux n in (p.2, p.1 + p.2)
+
+-- This recursion "goes down in two directions"... Again the EC does it in `rec` (or `brec`?) for us...
+def list_add {α : Type} [has_add α] : list α → list α → list α
+| []       _        := []
+| _        []       := []
+| (a :: l) (b :: m) := (a + b) :: list_add l m
+
+#eval list_add [1, 2, 3] [4, 5, 6, 6, 9, 10]
+
+
+-- A more complicated case is **well-founded recursion**:
+-- https://leanprover.github.io/theorem_proving_in_lean/induction_and_recursion.html#well-founded-recursion-and-induction
+-- (TODO: complete)
+
+#print acc                  -- `Π {α : Sort u} (r : α → α → Prop), α → Prop` (is an inductive type)
+#check @acc.intro           -- `Π {α : Sort u} {r : α → α → Prop}, ∀ (x : α), (∀ (y : α), r y x → acc r y) → acc r x` (its constructor)
+-- "If all elements of `α` 'preceding' `x` are accessible, then `x` is accessible."
+-- (In particular, if `x` has no predecessors, then it is accessible.)
+#print well_founded         -- `Π {α : Sort u} (r : α → α → Prop), Prop` (is a structure)
+#check @well_founded.apply  -- `Π {α : Sort u} {r : α → α → Prop}, well_founded r → ∀ (a : α), acc r a` (its projector or field)
+-- "The 'preceding' relation `r` is well-founded iff all elements of `α` are accessible under it."
+
+section
+  variables {α : Type} {r : α → α → Prop} (h : well_founded r)
+  variable C : α → Type -- Motive or target types
+  
+  -- Assume we have some recursion rule (i.e. "how to compute f(x) given all f(y)'s")
+  variable F : Π x, (Π (y : α), r y x → C y) → C x
+  -- The defined function, using `well_founded.fix` from the standard library!
+  def f : Π (x : α), C x := well_founded.fix h F
+  -- This `well_founded.fix` can also be seen as a "strong induction principle"...
+end
+
+def ack : nat → nat → nat
+| 0     y     := y+1
+| (x+1) 0     := ack x 1
+| (x+1) (y+1) := ack x (ack (x+1) y)
+
+#eval ack 3 5
+
+-- (TODO: `well_founded.fix`)
+-- **"WELL-FOUNDED RECURSION" IS JUST A SIMPLE STRUCTURAL RECURSION ON THE INDUCTIVE FAMILY `ACC`!!!**
+-- (TODO: how to prove a relation is well-founded? Map to ℕ or other well-orderings?)
+-- (See: https://leanprover-community.github.io/extras/well_founded_recursion.html#using_well_founded-rel_tac)
+
+-- (TODO: inaccessible terms)
+-- (See: https://leanprover.github.io/theorem_proving_in_lean/induction_and_recursion.html#inaccessible-terms)
+
+
+--------------------------------------------------------------------------------
+-- **Mutual inductive types**: compiled down to inductive families (indexed by a sum type)
+-- (If there are more than two variants, they are indexed by nested sum types)
+mutual inductive even, odd
+with even : ℕ → Prop
+| even_zero : even 0
+| even_succ : ∀ n, odd n → even (n + 1)
+with odd : ℕ → Prop
+| odd_succ : ∀ n, even n → odd (n + 1)
+
+#print even
+#print odd
+#print even._mut_
+#print even._mut_.rec
+-- It is extremely hard to use their recursor! We need the equation compiler to define functions.
+
+-- By constraints, we cannot actually use the type `list tree` in constructor arguments when defining the type `tree`.
+-- (`tree` can only appear as the "target" of dependent functions in the constructor arguments...)
+mutual inductive mtree, list_mtree (α : Type)
+with mtree : Type
+| node : α → list_mtree → mtree
+with list_mtree : Type
+| nil {} : list_mtree
+| cons   : mtree → list_mtree → list_mtree
+
+-- This (called a **nested inductive type**) will get compiled down to a "plain" inductive family
+-- As in mutual inductive types, the constructor type can be read off from the definitions, but the recursor is complicated.
+inductive mtree' (α : Type)
+| mk : α → list mtree' → mtree'
+
+#print mtree'
+#print _nest_1_1.mtree'
+#print _nest_1_1._nest_1_1.mtree'._mut_
+
+-- We can define "mutual functions" using the EC:
+-- (TODO: how are these compiled...)
+mutual def is_even, is_odd
+with is_even : ℕ → bool
+| 0       := tt
+| (a + 1) := is_odd a
+with is_odd : ℕ → bool
+| 0       := ff
+| (a + 1) := is_even a
+
+#print is_even
+#print is_even._main
+#print is_even.is_odd._mutual
+
+-- We can define mutual functions on mutual inductive types using the EC:
+
+theorem not_odd_zero : ¬ odd 0.
+-- See: https://discord.com/channels/679792285910827018/707609591940382830/876738938654568519
+
+mutual theorem even_of_odd_succ, odd_of_even_succ
+with even_of_odd_succ : ∀ n, odd (n + 1) → even n
+| _ (odd.odd_succ   n h) := h
+with odd_of_even_succ : ∀ n, even (n + 1) → odd n
+| _ (even.even_succ n h) := h
+
+inductive term
+| const : string → term
+| app   : string → list term → term
+
+mutual def num_consts, num_consts_lst
+with num_consts : term → nat
+| (term.const n)  := 1
+| (term.app n ts) := num_consts_lst ts
+with num_consts_lst : list term → nat
+| []      := 0
+| (t::ts) := num_consts t + num_consts_lst ts
+
+def sample_term := term.app "f" [term.app "g" [term.const "x"], term.const "y"]
+#eval num_consts sample_term
 
 
 end equation_compiler
@@ -1707,7 +2068,7 @@ end
 -- See: https://leanprover.github.io/theorem_proving_in_lean/type_classes.html
 
 example : 1 ≠ 0 ∧ (5 < 2 ∨ 3 < 7) := dec_trivial
-example : 1 ≠ 0 ∧ (5 < 2 ∨ 3 < 7) := begin exact dec_trivial end
+example : 1 ≠ 0 ∧ (5 < 2 ∨ 3 < 7) := by exact dec_trivial
 
 
 -- Some useful `#print`s:
@@ -1715,10 +2076,10 @@ example : 1 ≠ 0 ∧ (5 < 2 ∨ 3 < 7) := begin exact dec_trivial end
 -- #print instances inhabited'
 
 example : _root_.decidable (1 ≠ 0 ∧ (5 < 2 ∨ 3 < 7)) := infer_instance
-example : _root_.decidable (1 ≠ 0 ∧ (5 < 2 ∨ 3 < 7)) := begin apply_instance end
+example : _root_.decidable (1 ≠ 0 ∧ (5 < 2 ∨ 3 < 7)) := by apply_instance
 
--- (TODO: complete)
-
+-- (TODO: https://leanprover.github.io/theorem_proving_in_lean/type_classes.html#managing-type-class-inference)
+-- (TODO: https://leanprover.github.io/theorem_proving_in_lean/type_classes.html#coercions-using-type-classes)
 
 
 end typeclasses
@@ -1909,42 +2270,17 @@ end axiom_of_choice
 
 --------------------------------------------------------------------------------
 -- **Interacting with Lean**
+-- See: https://leanprover.github.io/theorem_proving_in_lean/interacting_with_lean.html
+
+--------------------------------------------------------------------------------
+
 
 /-
-(TODO: https://leanprover.github.io/theorem_proving_in_lean/interacting_with_lean.html)
+example : ∀ {α : Type} (β : α → Type) (hβ : ∀ (a : α), ∃ (b : β a), true), ∃ (f : Π (a : α), β a), true :=
+  λ α β hβ, ⟨λ a, by { specialize hβ a, cases hβ with b hb, exact b, }, trivial⟩
 
-* Importing files
-* Sections
-* Namespaces
-* Attributes
-* Implicit arguments
-* Notations [TODO: complete]
-* Coercions
-* Displaying information
-* Setting options
-* Elaboration hints
-* Using the library
+"induction tactic failed, recursor 'Exists.dcases_on' can only eliminate into Prop"
 -/
 
--- Automatic inserting of `coe`:
 
-variables m n : ℕ
-variables i j : ℤ
 
-#check i + m      -- i + ↑m : ℤ
-#check i + m + j  -- i + ↑m + j : ℤ
-#check i + m + n  -- i + ↑m + ↑n : ℤ
-
-#print notation ↑
-#print notation ⇑
-#print notation ↥
-
-#check @coe_fn
-#print has_coe_to_fun
-
-#print nat
-
-#check @prod.mk
-#check @prod.fst
-#check @prod.snd
-#check @prod.rec

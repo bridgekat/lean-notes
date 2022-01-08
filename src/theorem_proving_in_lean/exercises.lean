@@ -473,11 +473,6 @@ Note:
 -/
 
 
--- ### Exercise 6
-
--- TODO: complete reading: https://leanprover.github.io/theorem_proving_in_lean/interacting_with_lean.html
-
-
 -- ### Exercise 7
 
 namespace exercise_7
@@ -654,9 +649,9 @@ namespace mylist
   def append (s t : mylist α) : mylist α :=
     mylist.rec_on s t (λ a _, λ st', cons a st')
 
-  notation h :: t := cons h t -- ?
-  notation s ++ t := append s t -- ?
-  notation `[` l:(foldr `,` (h t, cons h t) nil) `]` := l -- ?????
+  local notation h :: t := cons h t -- ?
+  local notation s ++ t := append s t -- ?
+  local notation `[` l:(foldr `,` (h t, cons h t) nil) `]` := l -- ?????
 
   section
     open nat
@@ -804,6 +799,10 @@ end mynat
 namespace mylist
   variable {α : Type u}
 
+  local notation h :: t := cons h t -- ?
+  local notation s ++ t := append s t -- ?
+  local notation `[` l:(foldr `,` (h t, cons h t) nil) `]` := l -- ?????
+  
   def length : mylist α → ℕ :=
     λ l, mylist.rec 0 (λ _ _, λ (l' : ℕ), l'.succ) l
   
@@ -814,6 +813,7 @@ namespace mylist
   #reduce reverse [1, 2, 3, 4, 5]
 
   -- Even more manual equational rewriting...
+  -- (TODO: make clear about Lean's heuristics for second-order unification?)
   lemma length_append : Π (s t : mylist α), length (s ++ t) = length s + length t :=
     λ s t, @mylist.rec_on α
       (λ l, length (l ++ t) = length l + length t) s
@@ -865,8 +865,14 @@ namespace arith_expr
   #check var 5
   #check plus (const 2) (var 0)
 
-  -- TODO: variable assignment
-  def eval : arith_expr → ℕ := sorry
+  def eval : (ℕ → ℕ) → arith_expr → ℕ :=
+    λ as e, @arith_expr.rec_on (λ _, ℕ) e
+      id
+      as
+      (λ e1 e2, λ v1 v2, v1 + v2)
+      (λ e1 e2, λ v1 v2, v1 * v2)
+
+  #reduce eval id (plus (const 2) (var 0))
 
 end arith_expr
 
@@ -882,8 +888,13 @@ namespace boolean_expr
   #check var 5
   #check and (const ff) (var 0)
 
-  -- TODO: variable assignment
-  def eval : boolean_expr → ℕ := sorry
+  def eval : (ℕ → bool) → boolean_expr → bool :=
+    λ as e, @boolean_expr.rec_on (λ _, bool) e
+      id
+      as
+      (λ e', λ v', bnot v')
+      (λ e1 e2, λ v1 v2, band v1 v2)
+      (λ e1 e2, λ v1 v2, bor v1 v2)
 
   def size : boolean_expr → ℕ :=
     λ e, @boolean_expr.rec_on (λ _, ℕ) e
@@ -907,7 +918,7 @@ namespace boolean_expr
   def replace_all : boolean_expr → ℕ → boolean_expr → boolean_expr :=
     λ sub ind e, @boolean_expr.rec_on (λ _, boolean_expr) e
       (λ b, const b)
-      (λ v, ite (v = ind) sub (var v)) -- TODO: make clear: decidable_eq
+      (λ v, ite (v = ind) sub (var v))
       (λ _, λ e', not e')
       (λ _ _, λ e1' e2', and e1' e2')
       (λ _ _, λ e1' e2', or e1' e2')
@@ -937,7 +948,196 @@ end even_odd
 end exercise_7
 
 
+-- ### Exercise 8
 
+namespace exercise_8
+
+section
+  open function
+  #print surjective
+
+  universes u v w
+  variables {α : Type u} {β : Type v} {γ : Type w}
+  open function
+
+  lemma surjective_comp {g : β → γ} {f : α → β}
+    (hg : surjective g) (hf : surjective f) : surjective (g ∘ f) :=
+    λ c,
+      match hg c with (Exists.intro b hb) :=
+        match hf b with (Exists.intro a ha) :=
+          ⟨a, (ha.symm ▸ hb : g (f a) = c)⟩ end end
+end
+
+namespace hidden
+  open nat
+
+  def add : ℕ → ℕ → ℕ
+  | a 0        := a
+  | a (succ b) := succ (add a b)
+
+  lemma zero_add : Π (a : ℕ), add 0 a = a
+  | 0        := rfl
+  | (succ b) := congr_arg succ (zero_add b)
+
+  lemma succ_add : Π (a b : ℕ), add (succ a) b = succ (add a b)
+  | a 0        := rfl
+  | a (succ b) := congr_arg succ (succ_add a b)
+
+  lemma add_comm : Π (a b : ℕ), add a b = add b a
+  | a 0        := (zero_add a).symm
+  | a (succ b) := eq.trans (@@congr_arg succ (add_comm a b)) (succ_add b a).symm
+
+  lemma add_assoc : Π (a b c : ℕ), add a (add b c) = add (add a b) c
+  | a b 0        := rfl
+  | a b (succ c) := congr_arg succ (add_assoc a b c)
+
+end hidden
+
+namespace hidden
+  open list
+  variable {α : Type*}
+
+  def length : list α → ℕ
+  | []        := 0
+  | (x :: xs) := length xs + 1
+  
+  def reverse : list α → list α
+  | []        := []
+  | (x :: xs) := reverse xs ++ [x]
+  
+  lemma length_append : Π (s t : list α), length (s ++ t) = length s + length t
+  | []        t := (nat.zero_add _).symm
+  | (x :: xs) t :=
+    show length (xs ++ t) + 1 = length xs + 1 + length t,
+      by rw [nat.add_assoc, nat.add_comm 1, ← nat.add_assoc, length_append]
+
+  lemma length_reverse : Π (t : list α), length (reverse t) = length t
+  | []        := rfl
+  | (x :: xs) := 
+    show length (reverse xs ++ [x]) = length xs + 1,
+      by rw [length_append, length_reverse]; refl
+
+  lemma append_reverse_eq_reverse_append : Π (s t : list α), reverse (s ++ t) = reverse t ++ reverse s
+  | [] t        := (append_nil (reverse t)).symm
+  | (x :: xs) t :=
+    show reverse (xs ++ t) ++ [x] = reverse t ++ (reverse xs ++ [x]),
+      by rw [append_reverse_eq_reverse_append, append_assoc]
+
+  lemma reverse_reverse_eq_self : Π (t : list α), reverse (reverse t) = t
+  | []        := rfl
+  | (x :: xs) :=
+    show reverse (reverse xs ++ [x]) = x :: xs,
+      by rw [append_reverse_eq_reverse_append, reverse_reverse_eq_self]; refl
+
+end hidden
+
+section
+  #check @well_founded.fix
+
+  -- Structural recursion on `acc r`, given element `hwf.apply x`.
+  def well_founded.fix' {α : Sort*} {C : α → Sort*} {r : α → α → Prop}
+    (hwf : well_founded r) (R : Π (x : α), (Π (y : α), r y x → C y) → C x) :
+      Π (x : α), C x :=
+        λ x, @acc.rec_on α r C x (hwf.apply x) (λ x' hx', R x')
+end
+
+inductive vector (α : Type) : ℕ → Type
+| vnil  :                           vector 0
+| vcons : Π {n : ℕ}, α → vector n → vector n.succ
+
+namespace vector
+  def vec1 := vcons 1 (vcons 2 (vcons 3 vnil))
+  def vec2 := vcons 4 (vcons 5 vnil)
+
+  -- Using EC
+  def tail {α : Type} {n : ℕ} : vector α (n + 1) → vector α n
+  | (vcons a as) := as
+  
+  -- Using recursor
+  -- (See: https://leanprover.github.io/theorem_proving_in_lean/induction_and_recursion.html#dependent-pattern-matching)
+  def tail_aux {α : Type*} {n n' : ℕ} (v : vector α n') : n' = n + 1 → vector α n :=
+    vector.cases_on v -- Cases on `v` first so you could use that equality
+      (λ (h : 0 = n + 1), nat.no_confusion h)
+      (λ n' (a : α) (as : vector α n') (h : n' + 1 = n + 1),
+        nat.no_confusion h (λ h₁ : n' = n, eq.rec_on h₁ as))
+
+  def tail' {α : Type*} {n : ℕ} (v : vector α (n + 1)) : vector α n :=
+    tail_aux v rfl
+
+  -- Using EC
+  def append {α : Type} : Π {m : ℕ} (u : vector α m) {n : ℕ} (v : vector α n), vector α (n + m)
+  | nat.zero      vnil         n v := v
+  | (nat.succ m') (vcons a as) n v := vcons a (append as v)
+
+  #reduce append vec1 vec2
+
+  -- Using recursor (without using an auxiliary function???)
+  def append' {α : Type} : Π {m : ℕ} (u : vector α m) {n : ℕ} (v : vector α n), vector α (n + m) :=
+    λ m u n v,
+      @vector.rec_on _ (λ m' _, vector α (n + m')) _ u
+        v
+        (λ m' a as acc, vcons a acc)
+
+  #reduce append' vec1 vec2
+
+  -- (TODO: the real challenge???)
+  -- (See: https://leanprover.zulipchat.com/#narrow/stream/113489-new-members/topic/more.20more.20basics/near/190957263)
+end vector
+
+section
+  inductive aexpr : Type
+  | const : ℕ             → aexpr
+  | var   : ℕ             → aexpr
+  | plus  : aexpr → aexpr → aexpr
+  | times : aexpr → aexpr → aexpr
+
+  open aexpr
+
+  def sample_aexpr : aexpr := plus (times (var 0) (const 7)) (times (const 2) (var 1))
+  
+  def aeval (v : ℕ → ℕ) : aexpr → ℕ
+  | (const n)     := n
+  | (var n)       := v n
+  | (plus e₁ e₂)  := aeval e₁ + aeval e₂
+  | (times e₁ e₂) := aeval e₁ * aeval e₂
+
+  def sample_val : ℕ → ℕ
+  | 0 := 5
+  | 1 := 6
+  | _ := 0
+
+  #eval aeval sample_val sample_aexpr
+
+  def simp_const : aexpr → aexpr
+  | (plus (const n₁) (const n₂))  := const (n₁ + n₂)
+  | (times (const n₁) (const n₂)) := const (n₁ * n₂)
+  | e                             := e
+
+  def fuse : aexpr → aexpr
+  | (const n)     := (const n)
+  | (var n)       := (var n)
+  | (plus e₁ e₂)  := simp_const (plus (fuse e₁) (fuse e₂))
+  | (times e₁ e₂) := simp_const (times (fuse e₁) (fuse e₂))
+
+  theorem simp_const_eq (v : ℕ → ℕ) : ∀ e : aexpr, aeval v (simp_const e) = aeval v e
+  | (const n)     := rfl
+  | (var n)       := rfl
+  | (plus e₁ e₂)  := by { cases e₁; cases e₂; refl }
+  | (times e₁ e₂) := by { cases e₁; cases e₂; refl }
+
+  theorem fuse_eq (v : ℕ → ℕ) : ∀ e : aexpr, aeval v (fuse e) = aeval v e
+  | (const n)     := rfl
+  | (var n)       := rfl
+  | (plus e₁ e₂)  :=
+    show aeval v (simp_const (plus (fuse e₁) (fuse e₂))) = aeval v (plus e₁ e₂),
+      by { rw simp_const_eq, unfold aeval, rw [fuse_eq, fuse_eq] }
+  | (times e₁ e₂) :=
+    show aeval v (simp_const (times (fuse e₁) (fuse e₂))) = aeval v (times e₁ e₂),
+      by { rw simp_const_eq, unfold aeval, rw [fuse_eq, fuse_eq] }
+
+end
+
+end exercise_8
 
 
 

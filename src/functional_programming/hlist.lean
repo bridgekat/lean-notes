@@ -25,8 +25,11 @@ namespace vector
   | fsucc : Π {n : ℕ}, fin n → fin n.succ
 
   -- This is guaranteed to be exhaustive (the equation compiler could identify it!)
-  -- (TODO: make clear)
+  -- See: https://leanprover.github.io/theorem_proving_in_lean/induction_and_recursion.html#dependent-pattern-matching
   def get_element {α : Type} : Π {n : ℕ}, vector α n → fin n → α
+--  0 vnil         ...            := ...  -- no possible combination for the third parameter
+--  0 vcons ...    ...            := ...  -- no possible combination for the third parameter
+--  succ... vnil   ...            := ...  -- dependent type mismatch
   | _ (vcons x _)  fin.fzero      := x
   | _ (vcons _ xs) (fin.fsucc fn) := get_element xs fn
 

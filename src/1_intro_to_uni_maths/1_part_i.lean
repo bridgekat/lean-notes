@@ -138,7 +138,6 @@ section
   begin
     split,
     { rintros ⟨hf_inj, hf_surj⟩,
-      -- TODO: make clear
       let g : Y → X := (λ y, some (hf_surj y)),
       use g,
       split,
