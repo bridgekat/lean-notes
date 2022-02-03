@@ -29,6 +29,7 @@ axiom shadowing :
   -- Shadowing: there is someone who is better than QZR in everyone's eyes.
 
 theorem no_one_loves_QZR : ¬(∃x : Person, Loves x QZR) :=
+-- (Tactic mode proof)
 begin
   intros hx,
   cases hx with x hx,
@@ -46,3 +47,9 @@ begin
   },
   exact hnxy hxy,
 end
+
+theorem no_one_loves_QZR' : ¬(∃x : Person, Loves x QZR) :=
+-- (Term mode proof)
+  λ ⟨x, hx⟩,
+    let ⟨z, hz₁, hz₂⟩ := shadowing in
+      (exclusiveness x QZR hx) z hz₁ (preference x z QZR (hz₂ x) hx)
