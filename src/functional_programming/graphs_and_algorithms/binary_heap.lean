@@ -39,12 +39,14 @@ namespace min_heap
     | ∅            := default α
     | (node _ a _) := a
 
+    -- (TODO: fix it)
     def get_last : min_heap α → α
     | ∅            := default α
     | (node ∅ a ∅) := a
     | (node l a ∅) := get_last l
     | (node l a r) := get_last r
 
+    -- (TODO: fix it)
     def remove_last : min_heap α → min_heap α
     | ∅            := ∅
     | (node ∅ a ∅) := ∅
@@ -158,7 +160,7 @@ namespace min_heap
       { suffices : 0 < gpow2 (length ls + 2), { refine nat.sub_lt _ this, simp },
         exact zero_lt_gpow2 (length ls + 2) (zero_lt_succ _) },
       node (from_list $ take (l - 1) ls') (ls'.nth_le (l - 1) h₁) (from_list $ drop l ls')
-    using_well_founded {rel_tac := λ _ _, `[exact ⟨_, measure_wf length⟩]}
+    using_well_founded { rel_tac := λ _ _, `[exact ⟨_, measure_wf length⟩] }
 
   end
 
@@ -178,7 +180,7 @@ section
       simp [min_heap.size] at *,
       rw this, simp },
     hp.get_min :: extract_heap hp.remove_min
-  using_well_founded {rel_tac := λ _ _, `[exact ⟨_, measure_wf min_heap.size⟩]}
+  using_well_founded { rel_tac := λ _ _, `[exact ⟨_, measure_wf min_heap.size⟩] }
 
   def heapsort (ls : list α) : list α :=
     extract_heap ∘ min_heap.init_min_heap ∘ min_heap.from_list $ ls
@@ -186,6 +188,4 @@ section
   #eval heapsort $ [1, 4, 7, 4, 2, 1, 8, 9]
 
 end
-
-
 
